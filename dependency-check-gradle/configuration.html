@@ -56,6 +56,7 @@
       <ul class="nav nav-list">
     <li class="active"><a href="#"><span class="none"></span>Analyze Task</a>
   </li>
+    <li><a href="../dependency-check-gradle/configuration-aggregate.html" title="Aggregate Task"><span class="none"></span>Aggregate Task</a>  </li>
     <li><a href="../dependency-check-gradle/configuration-update.html" title="Update Task"><span class="none"></span>Update Task</a>  </li>
     <li><a href="../dependency-check-gradle/configuration-purge.html" title="Purge Task"><span class="none"></span>Purge Task</a>  </li>
       </ul>
@@ -104,19 +105,26 @@
     
 <tr class="b">
       
-<td>dependencyCheckAnalyze </td>
+<td><a href="configuration.html">dependencyCheckAnalyze</a> </td>
       
 <td>Runs dependency-check against the project and generates a report.</td>
     </tr>
     
 <tr class="a">
       
+<td><a href="configuration-aggregate.html">dependencyCheckAggregate</a> </td>
+      
+<td>Runs dependency-check against a multi-project build and generates an aggregate report.</td>
+    </tr>
+    
+<tr class="b">
+      
 <td><a href="configuration-update.html">dependencyCheckUpdate</a> </td>
       
 <td>Updates the local cache of the NVD data from NIST.</td>
     </tr>
     
-<tr class="b">
+<tr class="a">
       
 <td><a href="configuration-purge.html">dependencyCheckPurge</a> </td>
       
@@ -124,7 +132,7 @@
     </tr>
   </tbody>
 </table>
-<h1>Configuration:</h1>
+<h1>Configuration: dependencyCheckAnalyze</h1>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">buildscript {
@@ -132,7 +140,7 @@
         mavenCentral()
     }
     dependencies {
-        classpath 'org.owasp:dependency-check-gradle:${project.version}'
+        classpath 'org.owasp:dependency-check-gradle:2.1.0'
     }
 }
 apply plugin: 'org.owasp.dependencycheck'
@@ -254,10 +262,6 @@ check.dependsOn dependencyCheckAnalyze
     </tr>
   </tbody>
 </table>
-<div class="section">
-<div class="section">
-<div class="section">
-<h4><a name="Example"></a>Example</h4>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">dependencyCheck {
@@ -265,9 +269,7 @@ check.dependsOn dependencyCheckAnalyze
     cveValidForHours=1
     format='ALL'
 }
-</pre></div></div></div></div>
-<div class="section">
-<h3><a name="Proxy_Configuration"></a>Proxy Configuration</h3>
+</pre></div></div>
 
 <table border="0" class="table table-striped">
   <thead>
@@ -329,8 +331,6 @@ check.dependsOn dependencyCheckAnalyze
     </tr>
   </tbody>
 </table>
-<div class="section">
-<h4><a name="Example"></a>Example</h4>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">dependencyCheck {
@@ -339,9 +339,7 @@ check.dependsOn dependencyCheckAnalyze
         port=8989
     }
 }
-</pre></div></div></div></div>
-<div class="section">
-<h3><a name="Advanced_Configuration"></a>Advanced Configuration</h3>
+</pre></div></div>
 <p>The following properties can be configured in the dependencyCheck task. However, they are less frequently changed. One exception may be the cvedUrl properties, which can be used to host a mirror of the NVD within an enterprise environment. Note, if ANY of the cve configuration group are set - they should all be set to ensure things work as expected.</p>
 
 <table border="0" class="table table-striped">
@@ -471,8 +469,6 @@ check.dependsOn dependencyCheckAnalyze
     </tr>
   </tbody>
 </table>
-<div class="section">
-<h4><a name="Example"></a>Example</h4>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">dependencyCheck {
@@ -480,9 +476,7 @@ check.dependsOn dependencyCheckAnalyze
         directory='d:/nvd'
     }
 }
-</pre></div></div></div></div>
-<div class="section">
-<h3><a name="Analyzer_Configuration"></a>Analyzer Configuration</h3>
+</pre></div></div>
 <p>In addition to the above, the dependencyCheck plugin can be configured to enable or disable specific analyzers by configuring the <tt>analyzers</tt> section. Note, specific file type analyzers will automatically disable themselves if no file types that they support are detected - so specifically disabling the analyzers is likely not needed.</p>
 
 <table border="0" class="table table-striped">
@@ -716,8 +710,6 @@ check.dependsOn dependencyCheckAnalyze
     </tr>
   </tbody>
 </table>
-<div class="section">
-<h4><a name="Example"></a>Example</h4>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">dependencyCheck {
@@ -725,7 +717,7 @@ check.dependsOn dependencyCheckAnalyze
         assemblyEnabled=false
     }
 }
-</pre></div></div></div></div></div>
+</pre></div></div>
         </div>
       </div>
     </div>

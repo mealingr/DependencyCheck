@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="Date-Revision-yyyymmdd" content="20170723" />
     <meta http-equiv="Content-Language" content="en" />
-    <title>dependency-check &#x2013; Usage</title>
+    <title>dependency-check &#x2013; Tasks</title>
     <link rel="stylesheet" href="../css/apache-maven-fluido-1.6.min.css" />
     <link rel="stylesheet" href="../css/site.css" />
     <link rel="stylesheet" href="../css/print.css" media="print" />
@@ -35,7 +35,7 @@
       <div id="breadcrumbs">
         <ul class="breadcrumb">
         <li class=""><a href="../#" title=""></a><span class="divider">/</span></li>
-    <li class="active ">Usage</li>
+    <li class="active ">Tasks</li>
         <li id="publishDate" class="pull-right"><span class="divider">|</span> Last Published: 2017-07-23</li>
           <li id="projectVersion" class="pull-right">Version: 2.1.0</li>
         </ul>
@@ -52,11 +52,11 @@
     <li><a href="../dependency-check-cli/index.html" title="CLI"><span class="none"></span>CLI</a>  </li>
     <li><a href="../dependency-check-ant/index.html" title="Ant Task"><span class="none"></span>Ant Task</a>  </li>
     <li><a href="../dependency-check-maven/index.html" title="Maven Plugin"><span class="none"></span>Maven Plugin</a>  </li>
-    <li class="active"><a href="#"><span class="icon-chevron-down"></span>Gradle Plugin</a>
-
+    <li><a href="../dependency-check-gradle/index.html" title="Gradle Plugin"><span class="icon-chevron-down"></span>Gradle Plugin</a>
       <ul class="nav nav-list">
     <li><a href="../dependency-check-gradle/configuration.html" title="Analyze Task"><span class="none"></span>Analyze Task</a>  </li>
-    <li><a href="../dependency-check-gradle/configuration-aggregate.html" title="Aggregate Task"><span class="none"></span>Aggregate Task</a>  </li>
+    <li class="active"><a href="#"><span class="none"></span>Aggregate Task</a>
+  </li>
     <li><a href="../dependency-check-gradle/configuration-update.html" title="Update Task"><span class="none"></span>Update Task</a>  </li>
     <li><a href="../dependency-check-gradle/configuration-purge.html" title="Purge Task"><span class="none"></span>Purge Task</a>  </li>
       </ul>
@@ -89,15 +89,50 @@
           </div>
         </div>
         <div id="bodyColumn"  class="span10" >
-<h1>Usage</h1>
-<p>The OWASP dependency-check-gradle plugin provides monitoring of the projects dependent libraries; creating a report of known vulnerable components that are included in the build.</p>
-<p>It is important to understand that the first time this task is executed it may take 5-20 minutes as it downloads and processes the data from the National Vulnerability Database (NVD) hosted by NIST: <a class="externalLink" href="https://nvd.nist.gov">https://nvd.nist.gov</a></p>
-<p>After the first batch download, as long as the plugin is executed at least once every seven days the update will only take a few seconds.</p>
-<div class="section">
-<h2><a name="Quick_Start"></a>Quick Start</h2>
-<div class="section">
-<h3><a name="Step_1_Apply_dependency-check-gradle_plugin"></a>Step 1, Apply dependency-check-gradle plugin</h3>
-<p>Install from Maven central repo</p>
+<h1>Tasks</h1>
+
+<table border="0" class="table table-striped">
+  <thead>
+    
+<tr class="a">
+      
+<th>Task </th>
+      
+<th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    
+<tr class="b">
+      
+<td><a href="configuration.html">dependencyCheckAnalyze</a> </td>
+      
+<td>Runs dependency-check against the project and generates a report.</td>
+    </tr>
+    
+<tr class="a">
+      
+<td><a href="configuration-aggregate.html">dependencyCheckAggregate</a> </td>
+      
+<td>Runs dependency-check against a multi-project build and generates an aggregate report.</td>
+    </tr>
+    
+<tr class="b">
+      
+<td><a href="configuration-update.html">dependencyCheckUpdate</a> </td>
+      
+<td>Updates the local cache of the NVD data from NIST.</td>
+    </tr>
+    
+<tr class="a">
+      
+<td><a href="configuration-purge.html">dependencyCheckPurge</a> </td>
+      
+<td>Deletes the local copy of the NVD. This is used to force a refresh of the data.</td>
+    </tr>
+  </tbody>
+</table>
+<h1>Configuration: dependencyCheckAggregate</h1>
 
 <div class="source">
 <div class="source"><pre class="prettyprint linenums">buildscript {
@@ -108,28 +143,11 @@
         classpath 'org.owasp:dependency-check-gradle:2.1.0'
     }
 }
-
 apply plugin: 'org.owasp.dependencycheck'
-</pre></div></div></div>
-<div class="section">
-<h3><a name="Step_2_Run_the_dependencyCheckAnalyze_task"></a>Step 2, Run the dependencyCheckAnalyze task</h3>
-<p>Once the dependency-check plugin is applied, if the <a class="externalLink" href="https://docs.gradle.org/current/userguide/java_plugin.html">Java plugin</a> is being used dependency-check will automatically be added to the <tt>check</tt> task. Alternatively, you can run dependency-check directly:</p>
 
-<div class="source">
-<div class="source"><pre class="prettyprint linenums">gradle dependencyCheckAnalyze --info
+check.dependsOn dependencyCheckAggregate
 </pre></div></div>
-<p>The reports will be generated automatically under <tt>build/reports</tt> folder.</p></div></div>
-<div class="section">
-<h2><a name="Task_Configuration"></a>Task Configuration</h2>
-<p>The OWASP dependency-check-gradle plugin contains three tasks: <a href="configuration.html">dependencyCheckAnalyze</a>, <a href="configuration-aggregate.html">dependencyCheckAggregate</a>, <a href="configuration-update.html">dependencyCheckUpdate</a>, and <a href="configuration-purge.html">dependencyCheckPurge</a>. Please see each tasks configuration page for more information.</p></div>
-<div class="section">
-<h2><a name="Mailing_List"></a>Mailing List</h2>
-<p>Subscribe: <a class="externalLink" href="mailto:dependency-check+subscribe@googlegroups.com">dependency-check+subscribe@googlegroups.com</a></p>
-<p>Post: <a class="externalLink" href="mailto:dependency-check@googlegroups.com">dependency-check@googlegroups.com</a></p></div>
-<div class="section">
-<h2><a name="License"></a>License</h2>
-<p>Permission to modify and redistribute is granted under the terms of the Apache 2.0 license. See the <a class="externalLink" href="https://github.com/jeremylong/DependencyCheck/blob/master/dependency-check-gradle/LICENSE.txt">LICENSE.txt</a> file for the full license.</p>
-<p>Dependency-Check makes use of several other open source libraries. Please see the <a class="externalLink" href="https://github.com/jeremylong/DependencyCheck/blob/master/dependency-check-gradle/NOTICE.txt">NOTICE.txt</a> file for more information.</p></div>
+<p>For the configuration options of the <tt>dependencyCheck</tt> plugin, please see the <a href="configuration.html">dependencyCheckAnalyze</a> task documentation.</p>
         </div>
       </div>
     </div>
