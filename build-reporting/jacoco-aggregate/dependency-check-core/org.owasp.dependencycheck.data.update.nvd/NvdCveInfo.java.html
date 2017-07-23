@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NvdCveInfo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.update.nvd</a> &gt; <span class="el_source">NvdCveInfo.java</span></div><h1>NvdCveInfo.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.update.nvd;
+
+/**
+ * A pojo that contains the Url and timestamp of the current NvdCve XML files.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L25">public class NvdCveInfo {</span>
+
+    /**
+     * an id.
+     */
+    private String id;
+
+    /**
+     * Get the value of id.
+     *
+     * @return the value of id
+     */
+    public String getId() {
+<span class="fc" id="L38">        return id;</span>
+    }
+
+    /**
+     * Set the value of id.
+     *
+     * @param id new value of id
+     */
+    public void setId(String id) {
+<span class="fc" id="L47">        this.id = id;</span>
+<span class="fc" id="L48">    }</span>
+    /**
+     * a url.
+     */
+    private String url;
+
+    /**
+     * Get the value of url.
+     *
+     * @return the value of url
+     */
+    public String getUrl() {
+<span class="fc" id="L60">        return url;</span>
+    }
+
+    /**
+     * Set the value of url.
+     *
+     * @param url new value of url
+     */
+    public void setUrl(String url) {
+<span class="fc" id="L69">        this.url = url;</span>
+<span class="fc" id="L70">    }</span>
+    /**
+     * The 1.2 schema URL.
+     */
+    private String oldSchemaVersionUrl;
+
+    /**
+     * Get the value of oldSchemaVersionUrl.
+     *
+     * @return the value of oldSchemaVersionUrl
+     */
+    public String getOldSchemaVersionUrl() {
+<span class="fc" id="L82">        return oldSchemaVersionUrl;</span>
+    }
+
+    /**
+     * Set the value of oldSchemaVersionUrl.
+     *
+     * @param oldSchemaVersionUrl new value of oldSchemaVersionUrl
+     */
+    public void setOldSchemaVersionUrl(String oldSchemaVersionUrl) {
+<span class="fc" id="L91">        this.oldSchemaVersionUrl = oldSchemaVersionUrl;</span>
+<span class="fc" id="L92">    }</span>
+    /**
+     * a timestamp - epoch time.
+     */
+    private long timestamp;
+
+    /**
+     * Get the value of timestamp - epoch time.
+     *
+     * @return the value of timestamp - epoch time
+     */
+    public long getTimestamp() {
+<span class="fc" id="L104">        return timestamp;</span>
+    }
+
+    /**
+     * Set the value of timestamp - epoch time.
+     *
+     * @param timestamp new value of timestamp - epoch time
+     */
+    public void setTimestamp(long timestamp) {
+<span class="fc" id="L113">        this.timestamp = timestamp;</span>
+<span class="fc" id="L114">    }</span>
+    /**
+     * indicates whether or not this item should be updated.
+     */
+<span class="fc" id="L118">    private boolean needsUpdate = true;</span>
+
+    /**
+     * Get the value of needsUpdate.
+     *
+     * @return the value of needsUpdate
+     */
+    public boolean getNeedsUpdate() {
+<span class="fc" id="L126">        return needsUpdate;</span>
+    }
+
+    /**
+     * Set the value of needsUpdate.
+     *
+     * @param needsUpdate new value of needsUpdate
+     */
+    public void setNeedsUpdate(boolean needsUpdate) {
+<span class="fc" id="L135">        this.needsUpdate = needsUpdate;</span>
+<span class="fc" id="L136">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

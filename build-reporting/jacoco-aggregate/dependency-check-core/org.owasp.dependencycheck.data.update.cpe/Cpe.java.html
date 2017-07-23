@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Cpe.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.update.cpe</a> &gt; <span class="el_source">Cpe.java</span></div><h1>Cpe.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2015 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.update.cpe;
+
+import org.apache.commons.lang3.StringUtils;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import org.owasp.dependencycheck.data.update.exception.InvalidDataException;
+
+/**
+ *
+ * @author Jeremy Long
+ */
+public class Cpe {
+
+    /**
+     * Constructs a new Cpe Object by parsing the vendor and product from the CPE identifier value.
+     *
+     * @param value the cpe identifier (cpe:/a:vendor:product:version:....)
+     * @throws UnsupportedEncodingException thrown if UTF-8 is not supported
+     * @throws InvalidDataException thrown if the CPE provided is not the correct format
+     */
+<span class="nc" id="L38">    public Cpe(String value) throws UnsupportedEncodingException, InvalidDataException {</span>
+<span class="nc" id="L39">        this.value = value;</span>
+<span class="nc" id="L40">        final String valueWithoutPrefix = value.substring(7);</span>
+<span class="nc" id="L41">        final String[] data = StringUtils.split(valueWithoutPrefix, ':');</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (data.length &gt;= 2) {</span>
+<span class="nc" id="L43">            vendor = URLDecoder.decode(data[0].replace(&quot;+&quot;, &quot;%2B&quot;), &quot;UTF-8&quot;);</span>
+<span class="nc" id="L44">            product = URLDecoder.decode(data[1].replace(&quot;+&quot;, &quot;%2B&quot;), &quot;UTF-8&quot;);</span>
+        } else {
+<span class="nc" id="L46">            throw new InvalidDataException(String.format(&quot;CPE has an invalid format: %s&quot;, value));</span>
+        }
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * The CPE identifier string (cpe:/a:vendor:product:version).
+     */
+    private String value;
+
+    /**
+     * Get the value of value.
+     *
+     * @return the value of value
+     */
+    public String getValue() {
+<span class="nc" id="L61">        return value;</span>
+    }
+
+    /**
+     * Set the value of value.
+     *
+     * @param value new value of value
+     */
+    public void setValue(String value) {
+<span class="nc" id="L70">        this.value = value;</span>
+<span class="nc" id="L71">    }</span>
+    /**
+     * The vendor portion of the identifier.
+     */
+    private String vendor;
+
+    /**
+     * Get the value of vendor.
+     *
+     * @return the value of vendor
+     */
+    public String getVendor() {
+<span class="nc" id="L83">        return vendor;</span>
+    }
+
+    /**
+     * Set the value of vendor.
+     *
+     * @param vendor new value of vendor
+     */
+    public void setVendor(String vendor) {
+<span class="nc" id="L92">        this.vendor = vendor;</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * The product portion of the identifier.
+     */
+    private String product;
+
+    /**
+     * Get the value of product.
+     *
+     * @return the value of product
+     */
+    public String getProduct() {
+<span class="nc" id="L106">        return product;</span>
+    }
+
+    /**
+     * Set the value of product.
+     *
+     * @param product new value of product
+     */
+    public void setProduct(String product) {
+<span class="nc" id="L115">        this.product = product;</span>
+<span class="nc" id="L116">    }</span>
+
+    /**
+     * Returns the full CPE identifier.
+     *
+     * @return the full CPE identifier
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L125">        return value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

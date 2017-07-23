@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>VulnerableSoftware.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.dependency</a> &gt; <span class="el_source">VulnerableSoftware.java</span></div><h1>VulnerableSoftware.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.dependency;
+
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import org.apache.commons.lang3.StringUtils;
+import org.owasp.dependencycheck.data.cpe.IndexEntry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A record containing information about vulnerable software. This is referenced from a vulnerability.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L33">public class VulnerableSoftware extends IndexEntry implements Serializable, Comparable&lt;VulnerableSoftware&gt; {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L38">    private static final Logger LOGGER = LoggerFactory.getLogger(VulnerableSoftware.class);</span>
+    /**
+     * The serial version UID.
+     */
+    private static final long serialVersionUID = 307319490326651052L;
+
+    /**
+     * Parse a CPE entry from the cpe string representation.
+     *
+     * @param cpe a cpe entry (e.g. cpe:/a:vendor:software:version)
+     */
+    public void setCpe(String cpe) {
+        try {
+<span class="fc" id="L51">            parseName(cpe);</span>
+<span class="nc" id="L52">        } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L53">            LOGGER.warn(&quot;Character encoding is unsupported for CPE '{}'.&quot;, cpe);</span>
+<span class="nc" id="L54">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L55">            setName(cpe);</span>
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Parses a name attribute value, from the cpe.xml, into its corresponding parts: vendor, product, version, update.&lt;/p&gt;
+     * &lt;p&gt;
+     * Example:&lt;/p&gt;
+     * &lt;code&gt;&amp;nbsp;&amp;nbsp;&amp;nbsp;cpe:/a:apache:struts:1.1:rc2&lt;/code&gt;
+     *
+     * &lt;p&gt;
+     * Results in:&lt;/p&gt; &lt;ul&gt; &lt;li&gt;Vendor: apache&lt;/li&gt; &lt;li&gt;Product: struts&lt;/li&gt;
+     * &lt;li&gt;Version: 1.1&lt;/li&gt; &lt;li&gt;Revision: rc2&lt;/li&gt; &lt;/ul&gt;
+     *
+     * @param cpeName the cpe name
+     * @throws UnsupportedEncodingException should never be thrown...
+     */
+    @Override
+    public void parseName(String cpeName) throws UnsupportedEncodingException {
+<span class="fc" id="L75">        this.name = cpeName;</span>
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (cpeName != null &amp;&amp; cpeName.length() &gt; 7) {</span>
+<span class="fc" id="L77">            final String cpeNameWithoutPrefix = cpeName.substring(7);</span>
+<span class="fc" id="L78">            final String[] data = StringUtils.split(cpeNameWithoutPrefix, ':');</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (data.length &gt;= 1) {</span>
+<span class="fc" id="L80">                this.setVendor(urlDecode(data[0]));</span>
+            }
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (data.length &gt;= 2) {</span>
+<span class="fc" id="L83">                this.setProduct(urlDecode(data[1]));</span>
+            }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (data.length &gt;= 3) {</span>
+<span class="fc" id="L86">                version = urlDecode(data[2]);</span>
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (data.length &gt;= 4) {</span>
+<span class="fc" id="L89">                update = urlDecode(data[3]);</span>
+            }
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            if (data.length &gt;= 5) {</span>
+<span class="fc" id="L92">                edition = urlDecode(data[4]);</span>
+            }
+        }
+<span class="fc" id="L95">    }</span>
+    /**
+     * If present, indicates that previous version are vulnerable.
+     */
+    private String previousVersion;
+
+    /**
+     * Indicates if previous versions of this software are vulnerable.
+     *
+     * @return if previous versions of this software are vulnerable
+     */
+    public boolean hasPreviousVersion() {
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        return previousVersion != null;</span>
+    }
+
+    /**
+     * Get the value of previousVersion.
+     *
+     * @return the value of previousVersion
+     */
+    public String getPreviousVersion() {
+<span class="fc" id="L116">        return previousVersion;</span>
+    }
+
+    /**
+     * Set the value of previousVersion.
+     *
+     * @param previousVersion new value of previousVersion
+     */
+    public void setPreviousVersion(String previousVersion) {
+<span class="fc" id="L125">        this.previousVersion = previousVersion;</span>
+<span class="fc" id="L126">    }</span>
+
+    /**
+     * Standard equals implementation to compare this VulnerableSoftware to another object.
+     *
+     * @param obj the object to compare
+     * @return whether or not the objects are equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L137">            return false;</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L140">            return false;</span>
+        }
+<span class="fc" id="L142">        final VulnerableSoftware other = (VulnerableSoftware) obj;</span>
+<span class="pc bpc" id="L143" title="3 of 6 branches missed.">        return !((this.name == null) ? (other.getName() != null) : !this.name.equals(other.getName()));</span>
+    }
+
+    /**
+     * Standard implementation of hashCode.
+     *
+     * @return the hashCode for the object
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L153">        int hash = 7;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        hash = 83 * hash + (this.name != null ? this.name.hashCode() : 0);</span>
+<span class="fc" id="L155">        return hash;</span>
+    }
+
+    /**
+     * Standard toString() implementation display the name and whether or not previous versions are also affected.
+     *
+     * @return a string representation of the object
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L165">        return &quot;VulnerableSoftware{&quot; + name + &quot;[&quot; + previousVersion + &quot;]}&quot;;</span>
+    }
+
+    /**
+     * Implementation of the comparable interface.
+     *
+     * @param vs the VulnerableSoftware to compare
+     * @return an integer indicating the ordering of the two objects
+     */
+    @Override
+    public int compareTo(VulnerableSoftware vs) {
+<span class="fc" id="L176">        int result = 0;</span>
+<span class="fc" id="L177">        final String[] left = StringUtils.split(this.name, ':');</span>
+<span class="fc" id="L178">        final String[] right = StringUtils.split(vs.getName(), ':');</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        final int max = (left.length &lt;= right.length) ? left.length : right.length;</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (max &gt; 0) {</span>
+<span class="fc bfc" id="L181" title="All 4 branches covered.">            for (int i = 0; result == 0 &amp;&amp; i &lt; max; i++) {</span>
+<span class="fc" id="L182">                final String[] subLeft = left[i].split(&quot;(\\.|-)&quot;);</span>
+<span class="fc" id="L183">                final String[] subRight = right[i].split(&quot;(\\.|-)&quot;);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">                final int subMax = (subLeft.length &lt;= subRight.length) ? subLeft.length : subRight.length;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (subMax &gt; 0) {</span>
+<span class="fc bfc" id="L186" title="All 4 branches covered.">                    for (int x = 0; result == 0 &amp;&amp; x &lt; subMax; x++) {</span>
+<span class="fc bfc" id="L187" title="All 4 branches covered.">                        if (isPositiveInteger(subLeft[x]) &amp;&amp; isPositiveInteger(subRight[x])) {</span>
+                            try {
+<span class="fc" id="L189">                                result = Long.valueOf(subLeft[x]).compareTo(Long.valueOf(subRight[x]));</span>
+<span class="nc" id="L190">                            } catch (NumberFormatException ex) {</span>
+                                //ignore the exception - they obviously aren't numbers
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                                if (!subLeft[x].equalsIgnoreCase(subRight[x])) {</span>
+<span class="nc" id="L193">                                    result = subLeft[x].compareToIgnoreCase(subRight[x]);</span>
+                                }
+<span class="pc" id="L195">                            }</span>
+                        } else {
+<span class="fc" id="L197">                            result = subLeft[x].compareToIgnoreCase(subRight[x]);</span>
+                        }
+                    }
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                    if (result == 0) {</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                        if (subLeft.length &gt; subRight.length) {</span>
+<span class="fc" id="L202">                            result = 2;</span>
+                        }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">                        if (subRight.length &gt; subLeft.length) {</span>
+<span class="fc" id="L205">                            result = -2;</span>
+                        }
+                    }
+                } else {
+<span class="fc" id="L209">                    result = left[i].compareToIgnoreCase(right[i]);</span>
+                }
+            }
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (result == 0) {</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">                if (left.length &gt; right.length) {</span>
+<span class="fc" id="L214">                    result = 2;</span>
+                }
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (right.length &gt; left.length) {</span>
+<span class="fc" id="L217">                    result = -2;</span>
+                }
+            }
+        } else {
+<span class="nc" id="L221">            result = this.getName().compareToIgnoreCase(vs.getName());</span>
+        }
+<span class="fc" id="L223">        return result;</span>
+    }
+
+    /**
+     * Determines if the string passed in is a positive integer.
+     * To be counted as a positive integer, the string must only contain 0-9
+     * and must not have any leading zeros (though &quot;0&quot; is a valid positive
+     * integer).
+     *
+     * @param str the string to test
+     * @return true if the string only contains 0-9, otherwise false.
+     */
+    protected static boolean isPositiveInteger(final String str) {
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">        if (str == null || str.isEmpty()) {</span>
+<span class="nc" id="L237">            return false;</span>
+        }
+
+        // numbers with leading zeros should not be treated as numbers
+        // (e.g. when comparing &quot;01&quot; &lt;-&gt; &quot;1&quot;)
+<span class="fc bfc" id="L242" title="All 4 branches covered.">        if (str.charAt(0) == '0' &amp;&amp; str.length() &gt; 1) {</span>
+<span class="fc" id="L243">            return false;</span>
+        }
+
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="fc" id="L247">            final char c = str.charAt(i);</span>
+<span class="fc bfc" id="L248" title="All 4 branches covered.">            if (c &lt; '0' || c &gt; '9') {</span>
+<span class="fc" id="L249">                return false;</span>
+            }
+        }
+<span class="fc" id="L252">        return true;</span>
+    }
+    /**
+     * The name of the cpe.
+     */
+    private String name;
+
+    /**
+     * Get the value of name.
+     *
+     * @return the value of name
+     */
+    public String getName() {
+<span class="fc" id="L265">        return name;</span>
+    }
+
+    /**
+     * Set the value of name.
+     *
+     * @param name new value of name
+     */
+    public void setName(String name) {
+<span class="fc" id="L274">        this.name = name;</span>
+<span class="fc" id="L275">    }</span>
+    /**
+     * The product version number.
+     */
+    private String version;
+
+    /**
+     * Get the value of version.
+     *
+     * @return the value of version
+     */
+    public String getVersion() {
+<span class="fc" id="L287">        return version;</span>
+    }
+
+    /**
+     * Set the value of version.
+     *
+     * @param version new value of version
+     */
+    public void setVersion(String version) {
+<span class="nc" id="L296">        this.version = version;</span>
+<span class="nc" id="L297">    }</span>
+    /**
+     * The product update version.
+     */
+    private String update;
+
+    /**
+     * Get the value of update.
+     *
+     * @return the value of update
+     */
+    public String getUpdate() {
+<span class="fc" id="L309">        return update;</span>
+    }
+
+    /**
+     * Set the value of update.
+     *
+     * @param update new value of update
+     */
+    public void setUpdate(String update) {
+<span class="fc" id="L318">        this.update = update;</span>
+<span class="fc" id="L319">    }</span>
+    /**
+     * The product edition.
+     */
+    private String edition;
+
+    /**
+     * Get the value of edition.
+     *
+     * @return the value of edition
+     */
+    public String getEdition() {
+<span class="nc" id="L331">        return edition;</span>
+    }
+
+    /**
+     * Set the value of edition.
+     *
+     * @param edition new value of edition
+     */
+    public void setEdition(String edition) {
+<span class="nc" id="L340">        this.edition = edition;</span>
+<span class="nc" id="L341">    }</span>
+
+    /**
+     * Replaces '+' with '%2B' and then URL Decodes the string attempting first UTF-8, then ASCII, then default.
+     *
+     * @param string the string to URL Decode
+     * @return the URL Decoded string
+     */
+    private String urlDecode(String string) {
+<span class="fc" id="L350">        final String text = string.replace(&quot;+&quot;, &quot;%2B&quot;);</span>
+        String result;
+        try {
+<span class="fc" id="L353">            result = URLDecoder.decode(text, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L354">        } catch (UnsupportedEncodingException ex) {</span>
+            try {
+<span class="nc" id="L356">                result = URLDecoder.decode(text, &quot;ASCII&quot;);</span>
+<span class="nc" id="L357">            } catch (UnsupportedEncodingException ex1) {</span>
+<span class="nc" id="L358">                result = defaultUrlDecode(text);</span>
+<span class="nc" id="L359">            }</span>
+<span class="fc" id="L360">        }</span>
+<span class="fc" id="L361">        return result;</span>
+    }
+
+    /**
+     * Call {@link java.net.URLDecoder#decode(String)} to URL decode using the default encoding.
+     *
+     * @param text www-form-encoded URL to decode
+     * @return the newly decoded String
+     */
+    @SuppressWarnings(&quot;deprecation&quot;)
+    private String defaultUrlDecode(final String text) {
+<span class="nc" id="L372">        return URLDecoder.decode(text);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

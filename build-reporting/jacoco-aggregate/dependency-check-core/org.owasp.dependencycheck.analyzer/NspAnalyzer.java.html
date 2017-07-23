@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NspAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">NspAnalyzer.java</span></div><h1>NspAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2017 Steve Springett. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import org.apache.commons.io.FileUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.data.nsp.Advisory;
+import org.owasp.dependencycheck.data.nsp.NspSearch;
+import org.owasp.dependencycheck.data.nsp.SanitizePackage;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.EvidenceCollection;
+import org.owasp.dependencycheck.dependency.Identifier;
+import org.owasp.dependencycheck.dependency.Vulnerability;
+import org.owasp.dependencycheck.dependency.VulnerableSoftware;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import javax.json.Json;
+import javax.json.JsonException;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonReader;
+import javax.json.JsonString;
+import javax.json.JsonValue;
+import org.owasp.dependencycheck.exception.InitializationException;
+import org.owasp.dependencycheck.utils.URLConnectionFailureException;
+
+/**
+ * Used to analyze Node Package Manager (npm) package.json files via Node
+ * Security Platform (nsp).
+ *
+ * @author Steve Springett
+ */
+<span class="fc" id="L61">public class NspAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L66">    private static final Logger LOGGER = LoggerFactory.getLogger(NspAnalyzer.class);</span>
+
+    /**
+     * The default URL to the NSP check API.
+     */
+    public static final String DEFAULT_URL = &quot;https://api.nodesecurity.io/check&quot;;
+
+    /**
+     * The file name to scan.
+     */
+    private static final String PACKAGE_JSON = &quot;package.json&quot;;
+
+    /**
+     * Filter that detects files named &quot;package.json&quot;.
+     */
+<span class="fc" id="L81">    private static final FileFilter PACKAGE_JSON_FILTER = FileFilterBuilder.newInstance()</span>
+            .addFilenames(PACKAGE_JSON).build();
+
+    /**
+     * The NSP Searcher.
+     */
+    private NspSearch searcher;
+
+    /**
+     * Returns the FileFilter
+     *
+     * @return the FileFilter
+     */
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L96">        return PACKAGE_JSON_FILTER;</span>
+    }
+
+    /**
+     * Initializes the analyzer once before any analysis is performed.
+     *
+     * @throws InitializationException if there's an error during initialization
+     */
+    @Override
+    public void initializeFileTypeAnalyzer() throws InitializationException {
+<span class="fc" id="L106">        LOGGER.debug(&quot;Initializing {}&quot;, getName());</span>
+<span class="fc" id="L107">        final String searchUrl = Settings.getString(Settings.KEYS.ANALYZER_NSP_URL, DEFAULT_URL);</span>
+        try {
+<span class="fc" id="L109">            searcher = new NspSearch(new URL(searchUrl));</span>
+<span class="nc" id="L110">        } catch (MalformedURLException ex) {</span>
+<span class="nc" id="L111">            setEnabled(false);</span>
+<span class="nc" id="L112">            throw new InitializationException(&quot;The configured URL to Node Security Platform is malformed: &quot; + searchUrl, ex);</span>
+<span class="fc" id="L113">        }</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L123">        return &quot;Node Security Platform Analyzer&quot;;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L133">        return AnalysisPhase.FINDING_ANALYSIS;</span>
+    }
+
+    /**
+     * Returns the key used in the properties file to reference the analyzer's
+     * enabled property.x
+     *
+     * @return the analyzer's enabled property setting key
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L144">        return Settings.KEYS.ANALYZER_NSP_PACKAGE_ENABLED;</span>
+    }
+
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine) throws AnalysisException {
+<span class="fc" id="L149">        final File file = dependency.getActualFile();</span>
+<span class="pc" id="L150">        try (JsonReader jsonReader = Json.createReader(FileUtils.openInputStream(file))) {</span>
+
+            // Do not scan the node_modules directory
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (file.getCanonicalPath().contains(File.separator + &quot;node_modules&quot; + File.separator)) {</span>
+<span class="fc" id="L154">                LOGGER.debug(&quot;Skipping analysis of node module: &quot; + file.getCanonicalPath());</span>
+                return;
+            }
+
+            // Retrieves the contents of package.json from the Dependency
+<span class="fc" id="L159">            final JsonObject packageJson = jsonReader.readObject();</span>
+
+            // Create a sanitized version of the package.json
+<span class="fc" id="L162">            final JsonObject sanitizedJson = SanitizePackage.sanitize(packageJson);</span>
+
+            // Create a new 'package' object that acts as a container for the sanitized package.json
+<span class="fc" id="L165">            final JsonObjectBuilder builder = Json.createObjectBuilder();</span>
+<span class="fc" id="L166">            final JsonObject nspPayload = builder.add(&quot;package&quot;, sanitizedJson).build();</span>
+
+            // Submits the package payload to the nsp check service
+<span class="fc" id="L169">            final List&lt;Advisory&gt; advisories = searcher.submitPackage(nspPayload);</span>
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            for (Advisory advisory : advisories) {</span>
+                /*
+                 * Create a new vulnerability out of the advisory returned by nsp.
+                 */
+<span class="fc" id="L175">                final Vulnerability vuln = new Vulnerability();</span>
+<span class="fc" id="L176">                vuln.setCvssScore(advisory.getCvssScore());</span>
+<span class="fc" id="L177">                vuln.setDescription(advisory.getOverview());</span>
+<span class="fc" id="L178">                vuln.setName(String.valueOf(advisory.getId()));</span>
+<span class="fc" id="L179">                vuln.setSource(Vulnerability.Source.NSP);</span>
+<span class="fc" id="L180">                vuln.addReference(</span>
+                        &quot;NSP&quot;,
+                        &quot;Advisory &quot; + advisory.getId() + &quot;: &quot; + advisory.getTitle(),
+                        advisory.getAdvisory()
+                );
+
+                /*
+                 * Create a single vulnerable software object - these do not use CPEs unlike the NVD.
+                 */
+<span class="fc" id="L189">                final VulnerableSoftware vs = new VulnerableSoftware();</span>
+                //vs.setVersion(advisory.getVulnerableVersions());
+<span class="fc" id="L191">                vs.setUpdate(advisory.getPatchedVersions());</span>
+<span class="fc" id="L192">                vs.setName(advisory.getModule() + &quot;:&quot; + advisory.getVulnerableVersions());</span>
+<span class="fc" id="L193">                vuln.setVulnerableSoftware(new HashSet&lt;&gt;(Arrays.asList(vs)));</span>
+
+                // Add the vulnerability to package.json
+<span class="fc" id="L196">                dependency.getVulnerabilities().add(vuln);</span>
+<span class="fc" id="L197">            }</span>
+
+            /*
+             * Adds evidence about the node package itself, not any of the modules.
+             */
+<span class="fc" id="L202">            final EvidenceCollection productEvidence = dependency.getProductEvidence();</span>
+<span class="fc" id="L203">            final EvidenceCollection vendorEvidence = dependency.getVendorEvidence();</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;name&quot;)) {</span>
+<span class="fc" id="L205">                final Object value = packageJson.get(&quot;name&quot;);</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (value instanceof JsonString) {</span>
+<span class="fc" id="L207">                    final String valueString = ((JsonString) value).getString();</span>
+<span class="fc" id="L208">                    productEvidence.addEvidence(PACKAGE_JSON, &quot;name&quot;, valueString, Confidence.HIGHEST);</span>
+<span class="fc" id="L209">                    vendorEvidence.addEvidence(PACKAGE_JSON, &quot;name_project&quot;, String.format(&quot;%s_project&quot;, valueString), Confidence.LOW);</span>
+<span class="fc" id="L210">                } else {</span>
+<span class="nc" id="L211">                    LOGGER.warn(&quot;JSON value not string as expected: {}&quot;, value);</span>
+                }
+            }
+
+            /*
+             * Processes the dependencies objects in package.json and adds all the modules as related dependencies
+             */
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;dependencies&quot;)) {</span>
+<span class="fc" id="L219">                final JsonObject dependencies = packageJson.getJsonObject(&quot;dependencies&quot;);</span>
+<span class="fc" id="L220">                processPackage(dependency, dependencies, &quot;dependencies&quot;);</span>
+            }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;devDependencies&quot;)) {</span>
+<span class="fc" id="L223">                final JsonObject dependencies = packageJson.getJsonObject(&quot;devDependencies&quot;);</span>
+<span class="fc" id="L224">                processPackage(dependency, dependencies, &quot;devDependencies&quot;);</span>
+            }
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;optionalDependencies&quot;)) {</span>
+<span class="nc" id="L227">                final JsonObject dependencies = packageJson.getJsonObject(&quot;optionalDependencies&quot;);</span>
+<span class="nc" id="L228">                processPackage(dependency, dependencies, &quot;optionalDependencies&quot;);</span>
+            }
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;peerDependencies&quot;)) {</span>
+<span class="nc" id="L231">                final JsonObject dependencies = packageJson.getJsonObject(&quot;peerDependencies&quot;);</span>
+<span class="nc" id="L232">                processPackage(dependency, dependencies, &quot;peerDependencies&quot;);</span>
+            }
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;bundleDependencies&quot;)) {</span>
+<span class="nc" id="L235">                final JsonObject dependencies = packageJson.getJsonObject(&quot;bundleDependencies&quot;);</span>
+<span class="nc" id="L236">                processPackage(dependency, dependencies, &quot;bundleDependencies&quot;);</span>
+            }
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;bundledDependencies&quot;)) {</span>
+<span class="nc" id="L239">                final JsonObject dependencies = packageJson.getJsonObject(&quot;bundledDependencies&quot;);</span>
+<span class="nc" id="L240">                processPackage(dependency, dependencies, &quot;bundledDependencies&quot;);</span>
+            }
+
+            /*
+             * Adds the license if defined in package.json
+             */
+<span class="pc bpc" id="L246" title="1 of 2 branches missed.">            if (packageJson.containsKey(&quot;license&quot;)) {</span>
+<span class="fc" id="L247">                dependency.setLicense(packageJson.getString(&quot;license&quot;));</span>
+            }
+
+            /*
+             * Adds general evidence to about the package.
+             */
+<span class="fc" id="L253">            addToEvidence(packageJson, productEvidence, &quot;description&quot;);</span>
+<span class="fc" id="L254">            addToEvidence(packageJson, vendorEvidence, &quot;author&quot;);</span>
+<span class="fc" id="L255">            addToEvidence(packageJson, dependency.getVersionEvidence(), &quot;version&quot;);</span>
+<span class="fc" id="L256">            dependency.setDisplayFileName(String.format(&quot;%s/%s&quot;, file.getParentFile().getName(), file.getName()));</span>
+<span class="pc bpc" id="L257" title="8 of 12 branches missed.">        } catch (URLConnectionFailureException e) {</span>
+<span class="nc" id="L258">            this.setEnabled(false);</span>
+<span class="nc" id="L259">            throw new AnalysisException(e.getMessage(), e);</span>
+<span class="nc" id="L260">        } catch (IOException e) {</span>
+<span class="nc" id="L261">            LOGGER.debug(&quot;Error reading dependency or connecting to Node Security Platform - check API&quot;, e);</span>
+<span class="nc" id="L262">            this.setEnabled(false);</span>
+<span class="nc" id="L263">            throw new AnalysisException(e.getMessage(), e);</span>
+<span class="nc" id="L264">        } catch (JsonException e) {</span>
+<span class="nc" id="L265">            throw new AnalysisException(String.format(&quot;Failed to parse %s file.&quot;, file.getPath()), e);</span>
+<span class="fc" id="L266">        }</span>
+<span class="fc" id="L267">    }</span>
+
+    /**
+     * Processes a part of package.json (as defined by JsobObject) and update
+     * the specified dependency with relevant info.
+     *
+     * @param dependency the Dependency to update
+     * @param jsonObject the jsonObject to parse
+     * @param depType the dependency type
+     */
+    private void processPackage(Dependency dependency, JsonObject jsonObject, String depType) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (int i = 0; i &lt; jsonObject.size(); i++) {</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">            for (Map.Entry&lt;String, JsonValue&gt; entry : jsonObject.entrySet()) {</span>
+                /*
+                 * Create identifies that include the npm module and version. Since these are defined,
+                 * assign the highest confidence.
+                 */
+<span class="fc" id="L284">                final Identifier moduleName = new Identifier(&quot;npm&quot;, &quot;Module&quot;, null, entry.getKey());</span>
+<span class="fc" id="L285">                moduleName.setConfidence(Confidence.HIGHEST);</span>
+<span class="fc" id="L286">                String version = &quot;&quot;;</span>
+<span class="pc bpc" id="L287" title="2 of 4 branches missed.">                if (entry.getValue() != null &amp;&amp; entry.getValue().getValueType() == JsonValue.ValueType.STRING) {</span>
+<span class="fc" id="L288">                    version = ((JsonString) entry.getValue()).getString();</span>
+                }
+<span class="fc" id="L290">                final Identifier moduleVersion = new Identifier(&quot;npm&quot;, &quot;Version&quot;, null, version);</span>
+<span class="fc" id="L291">                moduleVersion.setConfidence(Confidence.HIGHEST);</span>
+
+<span class="fc" id="L293">                final Identifier moduleDepType = new Identifier(&quot;npm&quot;, &quot;Scope&quot;, null, depType);</span>
+<span class="fc" id="L294">                moduleVersion.setConfidence(Confidence.HIGHEST);</span>
+
+                /*
+                 * Create related dependencies for each module defined in package.json. The path to the related
+                 * dependency will not actually exist but needs to be unique (due to the use of Set in Dependency).
+                 * The use of related dependencies is a way to specify the actual software BOM in package.json.
+                 */
+<span class="fc" id="L301">                final Dependency nodeModule = new Dependency(new File(dependency.getActualFile() + &quot;#&quot; + entry.getKey()), true);</span>
+<span class="fc" id="L302">                nodeModule.setDisplayFileName(entry.getKey());</span>
+<span class="fc" id="L303">                nodeModule.setIdentifiers(new HashSet&lt;&gt;(Arrays.asList(moduleName, moduleVersion, moduleDepType)));</span>
+<span class="fc" id="L304">                dependency.addRelatedDependency(nodeModule);</span>
+<span class="fc" id="L305">            }</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    /**
+     * Adds information to an evidence collection from the node json
+     * configuration.
+     *
+     * @param json information from node.js
+     * @param collection a set of evidence about a dependency
+     * @param key the key to obtain the data from the json information
+     */
+    private void addToEvidence(JsonObject json, EvidenceCollection collection, String key) {
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        if (json.containsKey(key)) {</span>
+<span class="fc" id="L319">            final JsonValue value = json.get(key);</span>
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">            if (value instanceof JsonString) {</span>
+<span class="fc" id="L321">                collection.addEvidence(PACKAGE_JSON, key, ((JsonString) value).getString(), Confidence.HIGHEST);</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            } else if (value instanceof JsonObject) {</span>
+<span class="nc" id="L323">                final JsonObject jsonObject = (JsonObject) value;</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                for (final Map.Entry&lt;String, JsonValue&gt; entry : jsonObject.entrySet()) {</span>
+<span class="nc" id="L325">                    final String property = entry.getKey();</span>
+<span class="nc" id="L326">                    final JsonValue subValue = entry.getValue();</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">                    if (subValue instanceof JsonString) {</span>
+<span class="nc" id="L328">                        collection.addEvidence(PACKAGE_JSON,</span>
+                                String.format(&quot;%s.%s&quot;, key, property),
+                                ((JsonString) subValue).getString(),
+                                Confidence.HIGHEST);
+                    } else {
+<span class="nc" id="L333">                        LOGGER.warn(&quot;JSON sub-value not string as expected: {}&quot;, subValue);</span>
+                    }
+<span class="nc" id="L335">                }</span>
+<span class="nc" id="L336">            } else {</span>
+<span class="nc" id="L337">                LOGGER.warn(&quot;JSON value not string or JSON object as expected: {}&quot;, value);</span>
+            }
+        }
+<span class="fc" id="L340">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

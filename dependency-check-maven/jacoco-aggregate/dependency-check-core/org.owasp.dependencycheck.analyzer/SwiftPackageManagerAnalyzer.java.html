@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SwiftPackageManagerAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">SwiftPackageManagerAnalyzer.java</span></div><h1>SwiftPackageManagerAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2016 IBM Corporation. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.io.FileUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.EvidenceCollection;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+
+/**
+ * This analyzer is used to analyze the SWIFT Package Manager
+ * (https://swift.org/package-manager/). It collects information about a package
+ * from Package.swift files.
+ *
+ * @author Bianca Jiang (https://twitter.com/biancajiang)
+ */
+@Experimental
+<span class="fc" id="L44">public class SwiftPackageManagerAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;SWIFT Package Manager Analyzer&quot;;
+
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L54">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.INFORMATION_COLLECTION;</span>
+
+    /**
+     * The file name to scan.
+     */
+    public static final String SPM_FILE_NAME = &quot;Package.swift&quot;;
+
+    /**
+     * Filter that detects files named &quot;package.json&quot;.
+     */
+<span class="fc" id="L64">    private static final FileFilter SPM_FILE_FILTER = FileFilterBuilder.newInstance().addFilenames(SPM_FILE_NAME).build();</span>
+
+    /**
+     * The capture group #1 is the block variable. e.g. &quot;import
+     * PackageDescription let package = Package( name: &quot;Gloss&quot; )&quot;
+     */
+<span class="fc" id="L70">    private static final Pattern SPM_BLOCK_PATTERN = Pattern.compile(&quot;let[^=]+=\\s*Package\\s*\\(\\s*([^)]*)\\s*\\)&quot;, Pattern.DOTALL);</span>
+
+    /**
+     * Returns the FileFilter
+     *
+     * @return the FileFilter
+     */
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L79">        return SPM_FILE_FILTER;</span>
+    }
+
+    @Override
+    protected void initializeFileTypeAnalyzer() {
+        // NO-OP
+<span class="fc" id="L85">    }</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L94">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L104">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * Returns the key used in the properties file to reference the analyzer's
+     * enabled property.
+     *
+     * @return the analyzer's enabled property setting key
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L115">        return Settings.KEYS.ANALYZER_SWIFT_PACKAGE_MANAGER_ENABLED;</span>
+    }
+
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine)
+            throws AnalysisException {
+
+        String contents;
+        try {
+<span class="fc" id="L124">            contents = FileUtils.readFileToString(dependency.getActualFile(), Charset.defaultCharset());</span>
+<span class="nc" id="L125">        } catch (IOException e) {</span>
+<span class="nc" id="L126">            throw new AnalysisException(</span>
+                    &quot;Problem occurred while reading dependency file.&quot;, e);
+<span class="fc" id="L128">        }</span>
+<span class="fc" id="L129">        final Matcher matcher = SPM_BLOCK_PATTERN.matcher(contents);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+<span class="fc" id="L131">            final String packageDescription = matcher.group(1);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">            if (packageDescription.isEmpty()) {</span>
+<span class="nc" id="L133">                return;</span>
+            }
+
+<span class="fc" id="L136">            final EvidenceCollection product = dependency.getProductEvidence();</span>
+<span class="fc" id="L137">            final EvidenceCollection vendor = dependency.getVendorEvidence();</span>
+
+            //SPM is currently under development for SWIFT 3. Its current metadata includes package name and dependencies.
+            //Future interesting metadata: version, license, homepage, author, summary, etc.
+<span class="fc" id="L141">            final String name = addStringEvidence(product, packageDescription, &quot;name&quot;, &quot;name&quot;, Confidence.HIGHEST);</span>
+<span class="pc bpc" id="L142" title="2 of 4 branches missed.">            if (name != null &amp;&amp; !name.isEmpty()) {</span>
+<span class="fc" id="L143">                vendor.addEvidence(SPM_FILE_NAME, &quot;name_project&quot;, name, Confidence.HIGHEST);</span>
+            }
+        }
+<span class="fc" id="L146">        setPackagePath(dependency);</span>
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * Extracts evidence from the package description and adds it to the given
+     * evidence collection.
+     *
+     * @param evidences the evidence collection to update
+     * @param packageDescription the text to extract evidence from
+     * @param field the name of the field being searched for
+     * @param fieldPattern the field pattern within the contents to search for
+     * @param confidence the confidence level of the evidence if found
+     * @return the string that was added as evidence
+     */
+    private String addStringEvidence(EvidenceCollection evidences,
+            String packageDescription, String field, String fieldPattern, Confidence confidence) {
+<span class="fc" id="L162">        String value = &quot;&quot;;</span>
+
+<span class="fc" id="L164">        final Matcher matcher = Pattern.compile(</span>
+                String.format(&quot;%s *:\\s*\&quot;([^\&quot;]*)&quot;, fieldPattern), Pattern.DOTALL).matcher(packageDescription);
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+<span class="fc" id="L167">            value = matcher.group(1);</span>
+        }
+
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (value != null) {</span>
+<span class="fc" id="L171">            value = value.trim();</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (value.length() &gt; 0) {</span>
+<span class="fc" id="L173">                evidences.addEvidence(SPM_FILE_NAME, field, value, confidence);</span>
+            }
+        }
+
+<span class="fc" id="L177">        return value;</span>
+    }
+
+    /**
+     * Sets the package path on the given dependency.
+     *
+     * @param dep the dependency to update
+     */
+    private void setPackagePath(Dependency dep) {
+<span class="fc" id="L186">        final File file = new File(dep.getFilePath());</span>
+<span class="fc" id="L187">        final String parent = file.getParent();</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L189">            dep.setPackagePath(parent);</span>
+        }
+<span class="fc" id="L191">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

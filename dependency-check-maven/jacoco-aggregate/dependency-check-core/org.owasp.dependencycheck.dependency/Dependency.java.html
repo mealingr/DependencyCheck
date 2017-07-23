@@ -1,0 +1,824 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Dependency.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.dependency</a> &gt; <span class="el_source">Dependency.java</span></div><h1>Dependency.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.dependency;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.apache.commons.lang3.builder.EqualsBuilder;
+import org.apache.commons.lang3.builder.HashCodeBuilder;
+import org.owasp.dependencycheck.data.nexus.MavenArtifact;
+import org.owasp.dependencycheck.utils.Checksum;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A program dependency. This object is one of the core components within
+ * DependencyCheck. It is used to collect information about the dependency in
+ * the form of evidence. The Evidence is then used to determine if there are any
+ * known, published, vulnerabilities associated with the program dependency.
+ *
+ * @author Jeremy Long
+ */
+public class Dependency implements Serializable, Comparable&lt;Dependency&gt; {
+
+    /**
+     * The serial version UID for serialization.
+     */
+    private static final long serialVersionUID = 1L;
+    /**
+     * The logger.
+     */
+<span class="fc" id="L55">    private static final Logger LOGGER = LoggerFactory.getLogger(Dependency.class);</span>
+    /**
+     * Used as starting point for generating the value in {@link #hashCode()}.
+     */
+    private static final int MAGIC_HASH_INIT_VALUE = 3;
+    /**
+     * Used as a multiplier for generating the value in {@link #hashCode()}.
+     */
+    private static final int MAGIC_HASH_MULTIPLIER = 47;
+    /**
+     * The actual file path of the dependency on disk.
+     */
+    private String actualFilePath;
+    /**
+     * The file path to display.
+     */
+    private String filePath;
+    /**
+     * The file name of the dependency.
+     */
+    private String fileName;
+    /**
+     * The package path.
+     */
+    private String packagePath;
+    /**
+     * The md5 hash of the dependency.
+     */
+    private String md5sum;
+    /**
+     * The SHA1 hash of the dependency.
+     */
+    private String sha1sum;
+    /**
+     * A list of Identifiers.
+     */
+    private Set&lt;Identifier&gt; identifiers;
+    /**
+     * A collection of vendor evidence.
+     */
+    private final EvidenceCollection vendorEvidence;
+    /**
+     * A collection of product evidence.
+     */
+    private final EvidenceCollection productEvidence;
+    /**
+     * A collection of version evidence.
+     */
+    private final EvidenceCollection versionEvidence;
+    /**
+     * The file name to display in reports.
+     */
+<span class="fc" id="L107">    private String displayName = null;</span>
+    /**
+     * A set of identifiers that have been suppressed.
+     */
+    private Set&lt;Identifier&gt; suppressedIdentifiers;
+    /**
+     * A set of vulnerabilities that have been suppressed.
+     */
+    private SortedSet&lt;Vulnerability&gt; suppressedVulnerabilities;
+    /**
+     * The description of the JAR file.
+     */
+    private String description;
+    /**
+     * The license that this dependency uses.
+     */
+    private String license;
+    /**
+     * A list of vulnerabilities for this dependency.
+     */
+    private SortedSet&lt;Vulnerability&gt; vulnerabilities;
+    /**
+     * A collection of related dependencies.
+     */
+<span class="fc" id="L131">    private Set&lt;Dependency&gt; relatedDependencies = new TreeSet&lt;&gt;();</span>
+    /**
+     * A list of projects that reference this dependency.
+     */
+<span class="fc" id="L135">    private Set&lt;String&gt; projectReferences = new HashSet&lt;&gt;();</span>
+    /**
+     * A list of available versions.
+     */
+<span class="fc" id="L139">    private List&lt;String&gt; availableVersions = new ArrayList&lt;&gt;();</span>
+
+    /**
+     * Defines an actual or virtual dependency.
+     */
+<span class="fc" id="L144">    private boolean isVirtual = false;</span>
+
+    /**
+     * Returns the package path.
+     *
+     * @return the package path
+     */
+    public String getPackagePath() {
+<span class="fc" id="L152">        return packagePath;</span>
+    }
+
+    /**
+     * Sets the package path.
+     *
+     * @param packagePath the package path
+     */
+    public void setPackagePath(String packagePath) {
+<span class="fc" id="L161">        this.packagePath = packagePath;</span>
+<span class="fc" id="L162">    }</span>
+
+    /**
+     * Constructs a new Dependency object.
+     */
+<span class="fc" id="L167">    public Dependency() {</span>
+<span class="fc" id="L168">        vendorEvidence = new EvidenceCollection();</span>
+<span class="fc" id="L169">        productEvidence = new EvidenceCollection();</span>
+<span class="fc" id="L170">        versionEvidence = new EvidenceCollection();</span>
+<span class="fc" id="L171">        identifiers = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L172">        vulnerabilities = new TreeSet&lt;&gt;(new VulnerabilityComparator());</span>
+<span class="fc" id="L173">        suppressedIdentifiers = new TreeSet&lt;&gt;();</span>
+<span class="fc" id="L174">        suppressedVulnerabilities = new TreeSet&lt;&gt;(new VulnerabilityComparator());</span>
+<span class="fc" id="L175">    }</span>
+
+    /**
+     * Constructs a new Dependency object.
+     *
+     * @param file the File to create the dependency object from.
+     */
+    public Dependency(File file) {
+<span class="fc" id="L183">        this(file, false);</span>
+<span class="fc" id="L184">    }</span>
+
+    /**
+     * Constructs a new Dependency object.
+     *
+     * @param file the File to create the dependency object from.
+     * @param isVirtual specifies if the dependency is virtual indicating the file doesn't actually exist.
+     */
+    public Dependency(File file, boolean isVirtual) {
+<span class="fc" id="L193">        this();</span>
+<span class="fc" id="L194">        this.isVirtual = isVirtual;</span>
+<span class="fc" id="L195">        this.actualFilePath = file.getAbsolutePath();</span>
+<span class="fc" id="L196">        this.filePath = this.actualFilePath;</span>
+<span class="fc" id="L197">        this.fileName = file.getName();</span>
+<span class="fc" id="L198">        this.packagePath = filePath;</span>
+<span class="fc" id="L199">        determineHashes(file);</span>
+<span class="fc" id="L200">    }</span>
+
+    /**
+     * Returns the file name of the dependency.
+     *
+     * @return the file name of the dependency
+     */
+    public String getFileName() {
+<span class="fc" id="L208">        return this.fileName;</span>
+    }
+
+    /**
+     * Returns the file name of the dependency with the backslash escaped for
+     * use in JavaScript. This is a complete hack as I could not get the replace
+     * to work in the template itself.
+     *
+     * @return the file name of the dependency with the backslash escaped for
+     * use in JavaScript
+     */
+    public String getFileNameForJavaScript() {
+<span class="fc" id="L220">        return this.fileName.replace(&quot;\\&quot;, &quot;\\\\&quot;);</span>
+    }
+
+    /**
+     * Sets the file name of the dependency.
+     *
+     * @param fileName the file name of the dependency
+     */
+    public void setFileName(String fileName) {
+<span class="fc" id="L229">        this.fileName = fileName;</span>
+<span class="fc" id="L230">    }</span>
+
+    /**
+     * Sets the actual file path of the dependency on disk.
+     *
+     * @param actualFilePath the file path of the dependency
+     */
+    public void setActualFilePath(String actualFilePath) {
+<span class="fc" id="L238">        this.actualFilePath = actualFilePath;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (this.sha1sum == null) {</span>
+<span class="fc" id="L240">            final File file = new File(this.actualFilePath);</span>
+<span class="fc" id="L241">            determineHashes(file);</span>
+        }
+<span class="fc" id="L243">    }</span>
+
+    /**
+     * Gets the file path of the dependency.
+     *
+     * @return the file path of the dependency
+     */
+    public String getActualFilePath() {
+<span class="fc" id="L251">        return this.actualFilePath;</span>
+    }
+
+    /**
+     * Gets a reference to the File object.
+     *
+     * @return the File object
+     */
+    public File getActualFile() {
+<span class="fc" id="L260">        return new File(this.actualFilePath);</span>
+    }
+
+    /**
+     * Sets the file path of the dependency.
+     *
+     * @param filePath the file path of the dependency
+     */
+    public void setFilePath(String filePath) {
+<span class="pc bpc" id="L269" title="1 of 4 branches missed.">        if (this.packagePath == null || this.packagePath.equals(this.filePath)) {</span>
+<span class="fc" id="L270">            this.packagePath = filePath;</span>
+        }
+<span class="fc" id="L272">        this.filePath = filePath;</span>
+<span class="fc" id="L273">    }</span>
+
+    /**
+     * Sets the file name to display in reports.
+     *
+     * @param displayName the name to display
+     */
+    public void setDisplayFileName(String displayName) {
+<span class="fc" id="L281">        this.displayName = displayName;</span>
+<span class="fc" id="L282">    }</span>
+
+    /**
+     * Returns the file name to display in reports; if no display file name has
+     * been set it will default to the actual file name.
+     *
+     * @return the file name to display
+     */
+    public String getDisplayFileName() {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (displayName == null) {</span>
+<span class="fc" id="L292">            return this.fileName;</span>
+        }
+<span class="fc" id="L294">        return this.displayName;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Gets the file path of the dependency.&lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;b&gt;NOTE:&lt;/b&gt; This may not be the actual path of the file on disk. The
+     * actual path of the file on disk can be obtained via the
+     * getActualFilePath().&lt;/p&gt;
+     *
+     * @return the file path of the dependency
+     */
+    public String getFilePath() {
+<span class="fc" id="L308">        return this.filePath;</span>
+    }
+
+    /**
+     * Returns the MD5 Checksum of the dependency file.
+     *
+     * @return the MD5 Checksum
+     */
+    public String getMd5sum() {
+<span class="fc" id="L317">        return this.md5sum;</span>
+    }
+
+    /**
+     * Sets the MD5 Checksum of the dependency.
+     *
+     * @param md5sum the MD5 Checksum
+     */
+    public void setMd5sum(String md5sum) {
+<span class="fc" id="L326">        this.md5sum = md5sum;</span>
+<span class="fc" id="L327">    }</span>
+
+    /**
+     * Returns the SHA1 Checksum of the dependency.
+     *
+     * @return the SHA1 Checksum
+     */
+    public String getSha1sum() {
+<span class="fc" id="L335">        return this.sha1sum;</span>
+    }
+
+    /**
+     * Sets the SHA1 Checksum of the dependency.
+     *
+     * @param sha1sum the SHA1 Checksum
+     */
+    public void setSha1sum(String sha1sum) {
+<span class="fc" id="L344">        this.sha1sum = sha1sum;</span>
+<span class="fc" id="L345">    }</span>
+
+    /**
+     * Returns a List of Identifiers.
+     *
+     * @return an ArrayList of Identifiers
+     */
+    public Set&lt;Identifier&gt; getIdentifiers() {
+<span class="fc" id="L353">        return this.identifiers;</span>
+    }
+
+    /**
+     * Sets a List of Identifiers.
+     *
+     * @param identifiers A list of Identifiers
+     */
+    public void setIdentifiers(Set&lt;Identifier&gt; identifiers) {
+<span class="fc" id="L362">        this.identifiers = identifiers;</span>
+<span class="fc" id="L363">    }</span>
+
+    /**
+     * Adds an entry to the list of detected Identifiers for the dependency
+     * file.
+     *
+     * @param type the type of identifier (such as CPE)
+     * @param value the value of the identifier
+     * @param url the URL of the identifier
+     */
+    public void addIdentifier(String type, String value, String url) {
+<span class="fc" id="L374">        final Identifier i = new Identifier(type, value, url);</span>
+<span class="fc" id="L375">        this.identifiers.add(i);</span>
+<span class="fc" id="L376">    }</span>
+
+    /**
+     * Adds an entry to the list of detected Identifiers for the dependency
+     * file.
+     *
+     * @param type the type of identifier (such as CPE)
+     * @param value the value of the identifier
+     * @param url the URL of the identifier
+     * @param confidence the confidence in the Identifier being accurate
+     */
+    public void addIdentifier(String type, String value, String url, Confidence confidence) {
+<span class="fc" id="L388">        final Identifier i = new Identifier(type, value, url);</span>
+<span class="fc" id="L389">        i.setConfidence(confidence);</span>
+<span class="fc" id="L390">        this.identifiers.add(i);</span>
+<span class="fc" id="L391">    }</span>
+
+    /**
+     * Adds the maven artifact as evidence.
+     *
+     * @param source The source of the evidence
+     * @param mavenArtifact The maven artifact
+     * @param confidence The confidence level of this evidence
+     */
+    public void addAsEvidence(String source, MavenArtifact mavenArtifact, Confidence confidence) {
+<span class="pc bpc" id="L401" title="1 of 4 branches missed.">        if (mavenArtifact.getGroupId() != null &amp;&amp; !mavenArtifact.getGroupId().isEmpty()) {</span>
+<span class="fc" id="L402">            this.getVendorEvidence().addEvidence(source, &quot;groupid&quot;, mavenArtifact.getGroupId(), confidence);</span>
+        }
+<span class="pc bpc" id="L404" title="1 of 4 branches missed.">        if (mavenArtifact.getArtifactId() != null &amp;&amp; !mavenArtifact.getArtifactId().isEmpty()) {</span>
+<span class="fc" id="L405">            this.getProductEvidence().addEvidence(source, &quot;artifactid&quot;, mavenArtifact.getArtifactId(), confidence);</span>
+        }
+<span class="pc bpc" id="L407" title="1 of 4 branches missed.">        if (mavenArtifact.getVersion() != null &amp;&amp; !mavenArtifact.getVersion().isEmpty()) {</span>
+<span class="fc" id="L408">            this.getVersionEvidence().addEvidence(source, &quot;version&quot;, mavenArtifact.getVersion(), confidence);</span>
+        }
+<span class="pc bpc" id="L410" title="1 of 4 branches missed.">        if (mavenArtifact.getArtifactUrl() != null &amp;&amp; !mavenArtifact.getArtifactUrl().isEmpty()) {</span>
+<span class="fc" id="L411">            boolean found = false;</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            for (Identifier i : this.getIdentifiers()) {</span>
+<span class="pc bpc" id="L413" title="1 of 4 branches missed.">                if (&quot;maven&quot;.equals(i.getType()) &amp;&amp; i.getValue().equals(mavenArtifact.toString())) {</span>
+<span class="fc" id="L414">                    found = true;</span>
+<span class="fc" id="L415">                    i.setConfidence(Confidence.HIGHEST);</span>
+<span class="fc" id="L416">                    final String url = &quot;http://search.maven.org/#search|ga|1|1%3A%22&quot; + this.getSha1sum() + &quot;%22&quot;;</span>
+<span class="fc" id="L417">                    i.setUrl(url);</span>
+                    //i.setUrl(mavenArtifact.getArtifactUrl());
+<span class="fc" id="L419">                    LOGGER.debug(&quot;Already found identifier {}. Confidence set to highest&quot;, i.getValue());</span>
+<span class="fc" id="L420">                    break;</span>
+                }
+<span class="fc" id="L422">            }</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (!found) {</span>
+<span class="fc" id="L424">                LOGGER.debug(&quot;Adding new maven identifier {}&quot;, mavenArtifact);</span>
+<span class="fc" id="L425">                this.addIdentifier(&quot;maven&quot;, mavenArtifact.toString(), mavenArtifact.getArtifactUrl(), Confidence.HIGHEST);</span>
+            }
+        }
+<span class="fc" id="L428">    }</span>
+
+    /**
+     * Adds an entry to the list of detected Identifiers for the dependency
+     * file.
+     *
+     * @param identifier the identifier to add
+     */
+    public void addIdentifier(Identifier identifier) {
+<span class="fc" id="L437">        this.identifiers.add(identifier);</span>
+<span class="fc" id="L438">    }</span>
+
+    /**
+     * Get the value of suppressedIdentifiers.
+     *
+     * @return the value of suppressedIdentifiers
+     */
+    public Set&lt;Identifier&gt; getSuppressedIdentifiers() {
+<span class="fc" id="L446">        return suppressedIdentifiers;</span>
+    }
+
+    /**
+     * Set the value of suppressedIdentifiers.
+     *
+     * @param suppressedIdentifiers new value of suppressedIdentifiers
+     */
+    public void setSuppressedIdentifiers(Set&lt;Identifier&gt; suppressedIdentifiers) {
+<span class="nc" id="L455">        this.suppressedIdentifiers = suppressedIdentifiers;</span>
+<span class="nc" id="L456">    }</span>
+
+    /**
+     * Adds an identifier to the list of suppressed identifiers.
+     *
+     * @param identifier an identifier that was suppressed.
+     */
+    public void addSuppressedIdentifier(Identifier identifier) {
+<span class="fc" id="L464">        this.suppressedIdentifiers.add(identifier);</span>
+<span class="fc" id="L465">    }</span>
+
+    /**
+     * Get the value of suppressedVulnerabilities.
+     *
+     * @return the value of suppressedVulnerabilities
+     */
+    public SortedSet&lt;Vulnerability&gt; getSuppressedVulnerabilities() {
+<span class="fc" id="L473">        return suppressedVulnerabilities;</span>
+    }
+
+    /**
+     * Set the value of suppressedVulnerabilities.
+     *
+     * @param suppressedVulnerabilities new value of suppressedVulnerabilities
+     */
+    public void setSuppressedVulnerabilities(SortedSet&lt;Vulnerability&gt; suppressedVulnerabilities) {
+<span class="nc" id="L482">        this.suppressedVulnerabilities = suppressedVulnerabilities;</span>
+<span class="nc" id="L483">    }</span>
+
+    /**
+     * Adds a vulnerability to the set of suppressed vulnerabilities.
+     *
+     * @param vulnerability the vulnerability that was suppressed
+     */
+    public void addSuppressedVulnerability(Vulnerability vulnerability) {
+<span class="fc" id="L491">        this.suppressedVulnerabilities.add(vulnerability);</span>
+<span class="fc" id="L492">    }</span>
+
+    /**
+     * Returns the evidence used to identify this dependency.
+     *
+     * @return an EvidenceCollection.
+     */
+    public EvidenceCollection getEvidence() {
+<span class="fc" id="L500">        return EvidenceCollection.merge(this.productEvidence, this.vendorEvidence, this.versionEvidence);</span>
+    }
+
+    /**
+     * Returns the evidence used to identify this dependency.
+     *
+     * @return an EvidenceCollection.
+     */
+    public Set&lt;Evidence&gt; getEvidenceForDisplay() {
+<span class="fc" id="L509">        return EvidenceCollection.mergeForDisplay(this.productEvidence, this.vendorEvidence, this.versionEvidence);</span>
+    }
+
+    /**
+     * Returns the evidence used to identify this dependency.
+     *
+     * @return an EvidenceCollection.
+     */
+    public EvidenceCollection getEvidenceUsed() {
+<span class="fc" id="L518">        return EvidenceCollection.mergeUsed(this.productEvidence, this.vendorEvidence, this.versionEvidence);</span>
+    }
+
+    /**
+     * Gets the Vendor Evidence.
+     *
+     * @return an EvidenceCollection.
+     */
+    public EvidenceCollection getVendorEvidence() {
+<span class="fc" id="L527">        return this.vendorEvidence;</span>
+    }
+
+    /**
+     * Gets the Product Evidence.
+     *
+     * @return an EvidenceCollection.
+     */
+    public EvidenceCollection getProductEvidence() {
+<span class="fc" id="L536">        return this.productEvidence;</span>
+    }
+
+    /**
+     * Gets the Version Evidence.
+     *
+     * @return an EvidenceCollection.
+     */
+    public EvidenceCollection getVersionEvidence() {
+<span class="fc" id="L545">        return this.versionEvidence;</span>
+    }
+
+    /**
+     * Get the value of description.
+     *
+     * @return the value of description
+     */
+    public String getDescription() {
+<span class="fc" id="L554">        return description;</span>
+    }
+
+    /**
+     * Set the value of description.
+     *
+     * @param description new value of description
+     */
+    public void setDescription(String description) {
+<span class="fc" id="L563">        this.description = description;</span>
+<span class="fc" id="L564">    }</span>
+
+    /**
+     * Get the value of license.
+     *
+     * @return the value of license
+     */
+    public String getLicense() {
+<span class="fc" id="L572">        return license;</span>
+    }
+
+    /**
+     * Set the value of license.
+     *
+     * @param license new value of license
+     */
+    public void setLicense(String license) {
+<span class="fc" id="L581">        this.license = license;</span>
+<span class="fc" id="L582">    }</span>
+
+    /**
+     * Get the list of vulnerabilities.
+     *
+     * @return the list of vulnerabilities
+     */
+    public SortedSet&lt;Vulnerability&gt; getVulnerabilities() {
+<span class="fc" id="L590">        return vulnerabilities;</span>
+    }
+
+    /**
+     * Set the value of vulnerabilities.
+     *
+     * @param vulnerabilities new value of vulnerabilities
+     */
+    public void setVulnerabilities(SortedSet&lt;Vulnerability&gt; vulnerabilities) {
+<span class="nc" id="L599">        this.vulnerabilities = vulnerabilities;</span>
+<span class="nc" id="L600">    }</span>
+
+    /**
+     * Determines the sha1 and md5 sum for the given file.
+     *
+     * @param file the file to create checksums for
+     */
+    private void determineHashes(File file) {
+<span class="fc" id="L608">        String md5 = null;</span>
+<span class="fc" id="L609">        String sha1 = null;</span>
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (isVirtual) {</span>
+<span class="fc" id="L611">            return;</span>
+        }
+        try {
+<span class="fc" id="L614">            md5 = Checksum.getMD5Checksum(file);</span>
+<span class="fc" id="L615">            sha1 = Checksum.getSHA1Checksum(file);</span>
+<span class="nc" id="L616">        } catch (IOException ex) {</span>
+<span class="nc" id="L617">            LOGGER.warn(&quot;Unable to read '{}' to determine hashes.&quot;, file.getName());</span>
+<span class="nc" id="L618">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L619">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L620">            LOGGER.warn(&quot;Unable to use MD5 or SHA1 checksums.&quot;);</span>
+<span class="nc" id="L621">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="pc" id="L622">        }</span>
+<span class="fc" id="L623">        this.setMd5sum(md5);</span>
+<span class="fc" id="L624">        this.setSha1sum(sha1);</span>
+<span class="fc" id="L625">    }</span>
+
+    /**
+     * Adds a vulnerability to the dependency.
+     *
+     * @param vulnerability a vulnerability outlining a vulnerability.
+     */
+    public void addVulnerability(Vulnerability vulnerability) {
+<span class="fc" id="L633">        this.vulnerabilities.add(vulnerability);</span>
+<span class="fc" id="L634">    }</span>
+
+    /**
+     * Get the value of {@link #relatedDependencies}. This field is used to
+     * collect other dependencies which really represent the same dependency,
+     * and may be presented as one item in reports.
+     *
+     * @return the value of relatedDependencies
+     */
+    public Set&lt;Dependency&gt; getRelatedDependencies() {
+<span class="fc" id="L644">        return relatedDependencies;</span>
+    }
+
+    /**
+     * Get the value of projectReferences.
+     *
+     * @return the value of projectReferences
+     */
+    public Set&lt;String&gt; getProjectReferences() {
+<span class="fc" id="L653">        return projectReferences;</span>
+    }
+
+    /**
+     * Set the value of projectReferences.
+     *
+     * @param projectReferences new value of projectReferences
+     */
+    public void setProjectReferences(Set&lt;String&gt; projectReferences) {
+<span class="fc" id="L662">        this.projectReferences = projectReferences;</span>
+<span class="fc" id="L663">    }</span>
+
+    /**
+     * Adds a project reference.
+     *
+     * @param projectReference a project reference
+     */
+    public void addProjectReference(String projectReference) {
+<span class="nc" id="L671">        this.projectReferences.add(projectReference);</span>
+<span class="nc" id="L672">    }</span>
+
+    /**
+     * Add a collection of project reference.
+     *
+     * @param projectReferences a set of project references
+     */
+    public void addAllProjectReferences(Set&lt;String&gt; projectReferences) {
+<span class="nc" id="L680">        this.projectReferences.addAll(projectReferences);</span>
+<span class="nc" id="L681">    }</span>
+
+    /**
+     * Set the value of relatedDependencies.
+     *
+     * @param relatedDependencies new value of relatedDependencies
+     */
+    public void setRelatedDependencies(Set&lt;Dependency&gt; relatedDependencies) {
+<span class="nc" id="L689">        this.relatedDependencies = relatedDependencies;</span>
+<span class="nc" id="L690">    }</span>
+
+    /**
+     * Adds a related dependency. The internal collection is normally a
+     * {@link java.util.TreeSet}, which relies on
+     * {@link #compareTo(Dependency)}. A consequence of this is that if you
+     * attempt to add a dependency with the same file path (modulo character
+     * case) as one that is already in the collection, it won't get added.
+     *
+     * @param dependency a reference to the related dependency
+     */
+    public void addRelatedDependency(Dependency dependency) {
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">        if (this == dependency) {</span>
+<span class="nc" id="L703">            LOGGER.warn(&quot;Attempted to add a circular reference - please post the log file to issue #172 here &quot;</span>
+                    + &quot;https://github.com/jeremylong/DependencyCheck/issues/172&quot;);
+<span class="nc" id="L705">            LOGGER.debug(&quot;this: {}&quot;, this);</span>
+<span class="nc" id="L706">            LOGGER.debug(&quot;dependency: {}&quot;, dependency);</span>
+<span class="fc bfc" id="L707" title="All 2 branches covered.">        } else if (!relatedDependencies.add(dependency)) {</span>
+<span class="fc" id="L708">            LOGGER.debug(&quot;Failed to add dependency, likely due to referencing the same file as another dependency in the set.&quot;);</span>
+<span class="fc" id="L709">            LOGGER.debug(&quot;this: {}&quot;, this);</span>
+<span class="fc" id="L710">            LOGGER.debug(&quot;dependency: {}&quot;, dependency);</span>
+        }
+<span class="fc" id="L712">    }</span>
+
+    /**
+     * Get the value of availableVersions.
+     *
+     * @return the value of availableVersions
+     */
+    public List&lt;String&gt; getAvailableVersions() {
+<span class="nc" id="L720">        return availableVersions;</span>
+    }
+
+    /**
+     * Set the value of availableVersions.
+     *
+     * @param availableVersions new value of availableVersions
+     */
+    public void setAvailableVersions(List&lt;String&gt; availableVersions) {
+<span class="nc" id="L729">        this.availableVersions = availableVersions;</span>
+<span class="nc" id="L730">    }</span>
+
+    /**
+     * Adds a version to the available version list.
+     *
+     * @param version the version to add to the list
+     */
+    public void addAvailableVersion(String version) {
+<span class="nc" id="L738">        this.availableVersions.add(version);</span>
+<span class="nc" id="L739">    }</span>
+
+    /**
+     * Implementation of the Comparable&amp;lt;Dependency&amp;gt; interface. The
+     * comparison is solely based on the file path.
+     *
+     * @param o a dependency to compare
+     * @return an integer representing the natural ordering
+     */
+    @Override
+    public int compareTo(Dependency o) {
+<span class="fc" id="L750">        return this.getFilePath().compareToIgnoreCase(o.getFilePath());</span>
+    }
+
+    /**
+     * Implementation of the equals method.
+     *
+     * @param obj the object to compare
+     * @return true if the objects are equal, otherwise false
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L761" title="2 of 4 branches missed.">        if (obj == null || getClass() != obj.getClass()) {</span>
+<span class="nc" id="L762">            return false;</span>
+        }
+<span class="fc" id="L764">        final Dependency other = (Dependency) obj;</span>
+<span class="fc" id="L765">        return new EqualsBuilder()</span>
+                .appendSuper(super.equals(obj))
+                .append(this.actualFilePath, other.actualFilePath)
+                .append(this.filePath, other.filePath)
+                .append(this.fileName, other.fileName)
+                .append(this.packagePath, other.packagePath)
+                .append(this.md5sum, other.md5sum)
+                .append(this.sha1sum, other.sha1sum)
+                .append(this.identifiers, other.identifiers)
+                .append(this.vendorEvidence, other.vendorEvidence)
+                .append(this.productEvidence, other.productEvidence)
+                .append(this.versionEvidence, other.versionEvidence)
+                .append(this.description, other.description)
+                .append(this.license, other.license)
+                .append(this.vulnerabilities, other.vulnerabilities)
+                //.append(this.relatedDependencies, other.relatedDependencies)
+                .append(this.projectReferences, other.projectReferences)
+                .append(this.availableVersions, other.availableVersions)
+                .isEquals();
+    }
+
+    /**
+     * Generates the HashCode.
+     *
+     * @return the HashCode
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L793">        return new HashCodeBuilder(MAGIC_HASH_INIT_VALUE, MAGIC_HASH_MULTIPLIER)</span>
+                .append(actualFilePath)
+                .append(filePath)
+                .append(fileName)
+                .append(md5sum)
+                .append(sha1sum)
+                .append(identifiers)
+                .append(vendorEvidence)
+                .append(productEvidence)
+                .append(versionEvidence)
+                .append(description)
+                .append(license)
+                .append(vulnerabilities)
+                //.append(relatedDependencies)
+                .append(projectReferences)
+                .append(availableVersions)
+                .toHashCode();
+    }
+
+    /**
+     * Standard toString() implementation showing the filename, actualFilePath,
+     * and filePath.
+     *
+     * @return the string representation of the file
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L820">        return &quot;Dependency{ fileName='&quot; + fileName + &quot;', actualFilePath='&quot; + actualFilePath</span>
+                + &quot;', filePath='&quot; + filePath + &quot;', packagePath='&quot; + packagePath + &quot;'}&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

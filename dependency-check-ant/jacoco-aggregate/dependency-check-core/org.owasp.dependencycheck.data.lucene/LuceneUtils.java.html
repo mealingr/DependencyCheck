@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LuceneUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Ant Task</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.lucene</a> &gt; <span class="el_source">LuceneUtils.java</span></div><h1>LuceneUtils.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.lucene;
+
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.apache.lucene.util.Version;
+
+/**
+ * &lt;p&gt;
+ * Lucene utils is a set of utilize written to make constructing Lucene queries simpler.&lt;/p&gt;
+ *
+ * @author Jeremy Long
+ */
+public final class LuceneUtils {
+
+    /**
+     * The current version of Lucene being used. Declaring this one place so an upgrade doesn't require hunting through the code
+     * base.
+     */
+<span class="fc" id="L35">    public static final Version CURRENT_VERSION = Version.LUCENE_47;</span>
+
+    /**
+     * Private constructor as this is a utility class.
+     */
+<span class="nc" id="L40">    private LuceneUtils() {</span>
+<span class="nc" id="L41">    }</span>
+
+    /**
+     * Appends the text to the supplied StringBuilder escaping Lucene control characters in the process.
+     *
+     * @param buf a StringBuilder to append the escaped text to
+     * @param text the data to be escaped
+     */
+    @SuppressWarnings(&quot;fallthrough&quot;)
+    @SuppressFBWarnings(
+            value = &quot;SF_SWITCH_NO_DEFAULT&quot;,
+            justification = &quot;The switch below does have a default.&quot;)
+    public static void appendEscapedLuceneQuery(StringBuilder buf,
+            final CharSequence text) {
+
+<span class="pc bpc" id="L56" title="1 of 4 branches missed.">        if (text == null || buf == null) {</span>
+<span class="fc" id="L57">            return;</span>
+        }
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (int i = 0; i &lt; text.length(); i++) {</span>
+<span class="fc" id="L61">            final char c = text.charAt(i);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">            switch (c) {</span>
+                case '+':
+                case '-':
+                case '&amp;':
+                case '|':
+                case '!':
+                case '(':
+                case ')':
+                case '{':
+                case '}':
+                case '[':
+                case ']':
+                case '^':
+                case '&quot;':
+                case '~':
+                case '*':
+                case '?':
+                case ':':
+                case '/':
+                case '\\': //it is supposed to fall through here
+<span class="fc" id="L82">                    buf.append('\\');</span>
+                default:
+<span class="fc" id="L84">                    buf.append(c);</span>
+                    break;
+            }
+        }
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * Escapes the text passed in so that it is treated as data instead of control characters.
+     *
+     * @param text data to be escaped
+     * @return the escaped text.
+     */
+    public static String escapeLuceneQuery(final CharSequence text) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L98">            return null;</span>
+        }
+<span class="fc" id="L100">        final int size = text.length() &lt;&lt; 1;</span>
+<span class="fc" id="L101">        final StringBuilder buf = new StringBuilder(size);</span>
+<span class="fc" id="L102">        appendEscapedLuceneQuery(buf, text);</span>
+<span class="fc" id="L103">        return buf.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

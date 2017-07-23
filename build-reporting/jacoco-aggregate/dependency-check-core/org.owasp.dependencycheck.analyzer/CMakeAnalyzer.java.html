@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CMakeAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">CMakeAnalyzer.java</span></div><h1>CMakeAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2015 Institute for Defense Analyses. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.utils.Checksum;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.owasp.dependencycheck.exception.InitializationException;
+
+/**
+ * &lt;p&gt;
+ * Used to analyze CMake build files, and collect information that can be used
+ * to determine the associated CPE.&lt;/p&gt;
+ * &lt;p&gt;
+ * Note: This analyzer catches straightforward invocations of the project
+ * command, plus some other observed patterns of version inclusion in real CMake
+ * projects. Many projects make use of older versions of CMake and/or use custom
+ * &quot;homebrew&quot; ways to insert version information. Hopefully as the newer CMake
+ * call pattern grows in usage, this analyzer allow more CPEs to be
+ * identified.&lt;/p&gt;
+ *
+ * @author Dale Visser
+ */
+@Experimental
+<span class="fc" id="L58">public class CMakeAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L63">    private static final Logger LOGGER = LoggerFactory.getLogger(CMakeAnalyzer.class);</span>
+
+    /**
+     * Used when compiling file scanning regex patterns.
+     */
+    private static final int REGEX_OPTIONS = Pattern.DOTALL
+            | Pattern.CASE_INSENSITIVE | Pattern.MULTILINE;
+
+    /**
+     * Regex to extract the product information.
+     */
+<span class="fc" id="L74">    private static final Pattern PROJECT = Pattern.compile(</span>
+            &quot;^ *project *\\([ \\n]*(\\w+)[ \\n]*.*?\\)&quot;, REGEX_OPTIONS);
+
+    /**
+     * Regex to extract product and version information.
+     *
+     * Group 1: Product
+     *
+     * Group 2: Version
+     */
+<span class="fc" id="L84">    private static final Pattern SET_VERSION = Pattern</span>
+            .compile(
+                    &quot;^ *set\\s*\\(\\s*(\\w+)_version\\s+\&quot;?(\\d+(?:\\.\\d+)+)[\\s\&quot;]?\\)&quot;,
+                    REGEX_OPTIONS);
+
+    /**
+     * Detects files that can be analyzed.
+     */
+<span class="fc" id="L92">    private static final FileFilter FILTER = FileFilterBuilder.newInstance().addExtensions(&quot;.cmake&quot;)</span>
+            .addFilenames(&quot;CMakeLists.txt&quot;).build();
+
+    /**
+     * Returns the name of the CMake analyzer.
+     *
+     * @return the name of the analyzer
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L102">        return &quot;CMake Analyzer&quot;;</span>
+    }
+
+    /**
+     * Tell that we are used for information collection.
+     *
+     * @return INFORMATION_COLLECTION
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L112">        return AnalysisPhase.INFORMATION_COLLECTION;</span>
+    }
+
+    /**
+     * Returns the set of supported file extensions.
+     *
+     * @return the set of supported file extensions
+     */
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L122">        return FILTER;</span>
+    }
+
+    /**
+     * Initializes the analyzer.
+     *
+     * @throws InitializationException thrown if an exception occurs getting an
+     * instance of SHA1
+     */
+    @Override
+    protected void initializeFileTypeAnalyzer() throws InitializationException {
+        try {
+<span class="fc" id="L134">            getSha1MessageDigest();</span>
+<span class="fc" id="L135">        } catch (IllegalStateException ex) {</span>
+<span class="fc" id="L136">            setEnabled(false);</span>
+<span class="fc" id="L137">            throw new InitializationException(&quot;Unable to create SHA1 MessageDigest&quot;, ex);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">    }</span>
+
+    /**
+     * Analyzes python packages and adds evidence to the dependency.
+     *
+     * @param dependency the dependency being analyzed
+     * @param engine the engine being used to perform the scan
+     * @throws AnalysisException thrown if there is an unrecoverable error
+     * analyzing the dependency
+     */
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine)
+            throws AnalysisException {
+<span class="fc" id="L152">        final File file = dependency.getActualFile();</span>
+<span class="fc" id="L153">        final String parentName = file.getParentFile().getName();</span>
+<span class="fc" id="L154">        final String name = file.getName();</span>
+<span class="fc" id="L155">        dependency.setDisplayFileName(String.format(&quot;%s%c%s&quot;, parentName, File.separatorChar, name));</span>
+        String contents;
+        try {
+<span class="fc" id="L158">            contents = FileUtils.readFileToString(file, Charset.defaultCharset()).trim();</span>
+<span class="nc" id="L159">        } catch (IOException e) {</span>
+<span class="nc" id="L160">            throw new AnalysisException(</span>
+                    &quot;Problem occurred while reading dependency file.&quot;, e);
+<span class="fc" id="L162">        }</span>
+
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (StringUtils.isNotBlank(contents)) {</span>
+<span class="fc" id="L165">            final Matcher m = PROJECT.matcher(contents);</span>
+<span class="fc" id="L166">            int count = 0;</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            while (m.find()) {</span>
+<span class="fc" id="L168">                count++;</span>
+<span class="fc" id="L169">                LOGGER.debug(String.format(</span>
+                        &quot;Found project command match with %d groups: %s&quot;,
+                        m.groupCount(), m.group(0)));
+<span class="fc" id="L172">                final String group = m.group(1);</span>
+<span class="fc" id="L173">                LOGGER.debug(&quot;Group 1: {}&quot;, group);</span>
+<span class="fc" id="L174">                dependency.getProductEvidence().addEvidence(name, &quot;Project&quot;,</span>
+                        group, Confidence.HIGH);
+<span class="fc" id="L176">            }</span>
+<span class="fc" id="L177">            LOGGER.debug(&quot;Found {} matches.&quot;, count);</span>
+<span class="fc" id="L178">            analyzeSetVersionCommand(dependency, engine, contents);</span>
+        }
+<span class="fc" id="L180">    }</span>
+
+    /**
+     * Extracts the version information from the contents. If more then one
+     * version is found additional dependencies are added to the dependency
+     * list.
+     *
+     * @param dependency the dependency being analyzed
+     * @param engine the dependency-check engine
+     * @param contents the version information
+     */
+    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(
+            value = &quot;DM_DEFAULT_ENCODING&quot;,
+            justification = &quot;Default encoding is only used if UTF-8 is not available&quot;)
+    private void analyzeSetVersionCommand(Dependency dependency, Engine engine, String contents) {
+<span class="fc" id="L195">        Dependency currentDep = dependency;</span>
+
+<span class="fc" id="L197">        final Matcher m = SET_VERSION.matcher(contents);</span>
+<span class="fc" id="L198">        int count = 0;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        while (m.find()) {</span>
+<span class="fc" id="L200">            count++;</span>
+<span class="fc" id="L201">            LOGGER.debug(&quot;Found project command match with {} groups: {}&quot;,</span>
+                    m.groupCount(), m.group(0));
+<span class="fc" id="L203">            String product = m.group(1);</span>
+<span class="fc" id="L204">            final String version = m.group(2);</span>
+<span class="fc" id="L205">            LOGGER.debug(&quot;Group 1: {}&quot;, product);</span>
+<span class="fc" id="L206">            LOGGER.debug(&quot;Group 2: {}&quot;, version);</span>
+<span class="fc" id="L207">            final String aliasPrefix = &quot;ALIASOF_&quot;;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">            if (product.startsWith(aliasPrefix)) {</span>
+<span class="fc" id="L209">                product = product.replaceFirst(aliasPrefix, &quot;&quot;);</span>
+            }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (count &gt; 1) {</span>
+                //TODO - refactor so we do not assign to the parameter (checkstyle)
+<span class="fc" id="L213">                currentDep = new Dependency(dependency.getActualFile());</span>
+<span class="fc" id="L214">                currentDep.setDisplayFileName(String.format(&quot;%s:%s&quot;, dependency.getDisplayFileName(), product));</span>
+<span class="fc" id="L215">                final String filePath = String.format(&quot;%s:%s&quot;, dependency.getFilePath(), product);</span>
+<span class="fc" id="L216">                currentDep.setFilePath(filePath);</span>
+
+                byte[] path;
+                try {
+<span class="fc" id="L220">                    path = filePath.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc" id="L221">                } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L222">                    path = filePath.getBytes();</span>
+<span class="fc" id="L223">                }</span>
+<span class="fc" id="L224">                final MessageDigest sha1 = getSha1MessageDigest();</span>
+<span class="fc" id="L225">                currentDep.setSha1sum(Checksum.getHex(sha1.digest(path)));</span>
+<span class="fc" id="L226">                engine.getDependencies().add(currentDep);</span>
+            }
+<span class="fc" id="L228">            final String source = currentDep.getDisplayFileName();</span>
+<span class="fc" id="L229">            currentDep.getProductEvidence().addEvidence(source, &quot;Product&quot;,</span>
+                    product, Confidence.MEDIUM);
+<span class="fc" id="L231">            currentDep.getVersionEvidence().addEvidence(source, &quot;Version&quot;,</span>
+                    version, Confidence.MEDIUM);
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">        LOGGER.debug(&quot;Found {} matches.&quot;, count);</span>
+<span class="fc" id="L235">    }</span>
+
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L239">        return Settings.KEYS.ANALYZER_CMAKE_ENABLED;</span>
+    }
+
+    /**
+     * Returns the sha1 message digest.
+     *
+     * @return the sha1 message digest
+     */
+    private MessageDigest getSha1MessageDigest() {
+        try {
+<span class="fc" id="L249">            return MessageDigest.getInstance(&quot;SHA1&quot;);</span>
+<span class="fc" id="L250">        } catch (NoSuchAlgorithmException e) {</span>
+<span class="fc" id="L251">            LOGGER.error(e.getMessage());</span>
+<span class="fc" id="L252">            throw new IllegalStateException(&quot;Failed to obtain the SHA1 message digest.&quot;, e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

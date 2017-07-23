@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TokenPairConcatenatingFilter.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.lucene</a> &gt; <span class="el_source">TokenPairConcatenatingFilter.java</span></div><h1>TokenPairConcatenatingFilter.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.lucene;
+
+import java.io.IOException;
+import java.util.LinkedList;
+import org.apache.lucene.analysis.TokenFilter;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+
+/**
+ * &lt;p&gt;
+ * Takes a TokenStream and adds additional tokens by concatenating pairs of words.&lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;b&gt;Example:&lt;/b&gt; &quot;Spring Framework Core&quot; -&amp;gt; &quot;Spring SpringFramework Framework FrameworkCore Core&quot;.&lt;/p&gt;
+ *
+ * @author Jeremy Long
+ */
+public final class TokenPairConcatenatingFilter extends TokenFilter {
+
+    /**
+     * The char term attribute.
+     */
+<span class="fc" id="L39">    private final CharTermAttribute termAtt = addAttribute(CharTermAttribute.class);</span>
+    /**
+     * The previous word parsed.
+     */
+    private String previousWord;
+    /**
+     * A list of words parsed.
+     */
+    private final LinkedList&lt;String&gt; words;
+
+    /**
+     * Returns the previous word. This is needed in the test cases.
+     *
+     * @return te previous word
+     */
+    protected String getPreviousWord() {
+<span class="fc" id="L55">        return previousWord;</span>
+    }
+
+    /**
+     * Returns the words list. This is needed in the test cases.
+     *
+     * @return the words list
+     */
+    protected LinkedList&lt;String&gt; getWords() {
+<span class="fc" id="L64">        return words;</span>
+    }
+
+    /**
+     * Constructs a new TokenPairConcatenatingFilter.
+     *
+     * @param stream the TokenStream that this filter will process
+     */
+    public TokenPairConcatenatingFilter(TokenStream stream) {
+<span class="fc" id="L73">        super(stream);</span>
+<span class="fc" id="L74">        words = new LinkedList&lt;&gt;();</span>
+<span class="fc" id="L75">    }</span>
+
+    /**
+     * Increments the underlying TokenStream and sets CharTermAttributes to construct an expanded set of tokens by concatenating
+     * tokens with the previous token.
+     *
+     * @return whether or not we have hit the end of the TokenStream
+     * @throws IOException is thrown when an IOException occurs
+     */
+    @Override
+    public boolean incrementToken() throws IOException {
+
+        //collect all the terms into the words collection
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        while (input.incrementToken()) {</span>
+<span class="fc" id="L89">            final String word = new String(termAtt.buffer(), 0, termAtt.length());</span>
+<span class="fc" id="L90">            words.add(word);</span>
+<span class="fc" id="L91">        }</span>
+
+        //if we have a previousTerm - write it out as its own token concatenated
+        // with the current word (if one is available).
+<span class="fc bfc" id="L95" title="All 4 branches covered.">        if (previousWord != null &amp;&amp; !words.isEmpty()) {</span>
+<span class="fc" id="L96">            final String word = words.getFirst();</span>
+<span class="fc" id="L97">            clearAttributes();</span>
+<span class="fc" id="L98">            termAtt.append(previousWord).append(word);</span>
+<span class="fc" id="L99">            previousWord = null;</span>
+<span class="fc" id="L100">            return true;</span>
+        }
+        //if we have words, write it out as a single token
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!words.isEmpty()) {</span>
+<span class="fc" id="L104">            final String word = words.removeFirst();</span>
+<span class="fc" id="L105">            clearAttributes();</span>
+<span class="fc" id="L106">            termAtt.append(word);</span>
+<span class="fc" id="L107">            previousWord = word;</span>
+<span class="fc" id="L108">            return true;</span>
+        }
+<span class="fc" id="L110">        return false;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Resets the Filter and clears any internal state data that may have been left-over from previous uses of the Filter.&lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;b&gt;If this Filter is re-used this method must be called between uses.&lt;/b&gt;&lt;/p&gt;
+     */
+    public void clear() {
+<span class="fc" id="L120">        previousWord = null;</span>
+<span class="fc" id="L121">        words.clear();</span>
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Standard hash code implementation.
+     *
+     * @return the hash code
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L131">        int hash = 3;</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        hash = 31 * hash + (this.termAtt != null ? this.termAtt.hashCode() : 0);</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        hash = 31 * hash + (this.previousWord != null ? this.previousWord.hashCode() : 0);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        hash = 31 * hash + (this.words != null ? this.words.hashCode() : 0);</span>
+<span class="nc" id="L135">        return hash;</span>
+    }
+
+    /**
+     * Standard equals implementation.
+     *
+     * @param obj the object to compare
+     * @return true if the objects are equal; otherwise false.
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L147">            return false;</span>
+        }
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L150">            return false;</span>
+        }
+<span class="nc" id="L152">        final TokenPairConcatenatingFilter other = (TokenPairConcatenatingFilter) obj;</span>
+<span class="nc bnc" id="L153" title="All 6 branches missed.">        if (this.termAtt != other.termAtt &amp;&amp; (this.termAtt == null || !this.termAtt.equals(other.termAtt))) {</span>
+<span class="nc" id="L154">            return false;</span>
+        }
+<span class="nc bnc" id="L156" title="All 6 branches missed.">        if ((this.previousWord == null) ? (other.previousWord != null) : !this.previousWord.equals(other.previousWord)) {</span>
+<span class="nc" id="L157">            return false;</span>
+        }
+<span class="nc bnc" id="L159" title="All 6 branches missed.">        return !(this.words != other.words &amp;&amp; (this.words == null || !this.words.equals(other.words)));</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

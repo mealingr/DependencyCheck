@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RubyGemspecAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Ant Task</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">RubyGemspecAnalyzer.java</span></div><h1>RubyGemspecAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2015 Institute for Defense Analyses. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.io.FileUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.EvidenceCollection;
+import org.owasp.dependencycheck.exception.InitializationException;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Used to analyze Ruby Gem specifications and collect information that can be
+ * used to determine the associated CPE. Regular expressions are used to parse
+ * the well-defined Ruby syntax that forms the specification.
+ *
+ * @author Dale Visser
+ */
+@Experimental
+<span class="fc" id="L49">public class RubyGemspecAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L54">    private static final Logger LOGGER = LoggerFactory.getLogger(RubyGemspecAnalyzer.class);</span>
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;Ruby Gemspec Analyzer&quot;;
+
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L63">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.INFORMATION_COLLECTION;</span>
+
+    /**
+     * The gemspec file extension.
+     */
+    private static final String GEMSPEC = &quot;gemspec&quot;;
+
+    /**
+     * The file filter containing the list of file extensions that can be
+     * analyzed.
+     */
+<span class="fc" id="L74">    private static final FileFilter FILTER = FileFilterBuilder.newInstance().addExtensions(GEMSPEC).build();</span>
+    //TODO: support Rakefile
+    //= FileFilterBuilder.newInstance().addExtensions(GEMSPEC).addFilenames(&quot;Rakefile&quot;).build();
+
+    /**
+     * The name of the version file.
+     */
+    private static final String VERSION_FILE_NAME = &quot;VERSION&quot;;
+
+    /**
+     * @return a filter that accepts files matching the glob pattern, *.gemspec
+     */
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L88">        return FILTER;</span>
+    }
+
+    @Override
+    protected void initializeFileTypeAnalyzer() throws InitializationException {
+        // NO-OP
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L103">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L113">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * Returns the key used in the properties file to reference the analyzer's
+     * enabled property.
+     *
+     * @return the analyzer's enabled property setting key
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L124">        return Settings.KEYS.ANALYZER_RUBY_GEMSPEC_ENABLED;</span>
+    }
+
+    /**
+     * The capture group #1 is the block variable.
+     */
+<span class="fc" id="L130">    private static final Pattern GEMSPEC_BLOCK_INIT = Pattern.compile(&quot;Gem::Specification\\.new\\s+?do\\s+?\\|(.+?)\\|&quot;);</span>
+
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine)
+            throws AnalysisException {
+        String contents;
+        try {
+<span class="fc" id="L137">            contents = FileUtils.readFileToString(dependency.getActualFile(), Charset.defaultCharset());</span>
+<span class="nc" id="L138">        } catch (IOException e) {</span>
+<span class="nc" id="L139">            throw new AnalysisException(</span>
+                    &quot;Problem occurred while reading dependency file.&quot;, e);
+<span class="fc" id="L141">        }</span>
+<span class="fc" id="L142">        final Matcher matcher = GEMSPEC_BLOCK_INIT.matcher(contents);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (matcher.find()) {</span>
+<span class="fc" id="L144">            contents = contents.substring(matcher.end());</span>
+<span class="fc" id="L145">            final String blockVariable = matcher.group(1);</span>
+
+<span class="fc" id="L147">            final EvidenceCollection vendor = dependency.getVendorEvidence();</span>
+<span class="fc" id="L148">            final EvidenceCollection product = dependency.getProductEvidence();</span>
+<span class="fc" id="L149">            final String name = addStringEvidence(product, contents, blockVariable, &quot;name&quot;, &quot;name&quot;, Confidence.HIGHEST);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">            if (!name.isEmpty()) {</span>
+<span class="fc" id="L151">                vendor.addEvidence(GEMSPEC, &quot;name_project&quot;, name + &quot;_project&quot;, Confidence.LOW);</span>
+            }
+<span class="fc" id="L153">            addStringEvidence(product, contents, blockVariable, &quot;summary&quot;, &quot;summary&quot;, Confidence.LOW);</span>
+
+<span class="fc" id="L155">            addStringEvidence(vendor, contents, blockVariable, &quot;author&quot;, &quot;authors?&quot;, Confidence.HIGHEST);</span>
+<span class="fc" id="L156">            addStringEvidence(vendor, contents, blockVariable, &quot;email&quot;, &quot;emails?&quot;, Confidence.MEDIUM);</span>
+<span class="fc" id="L157">            addStringEvidence(vendor, contents, blockVariable, &quot;homepage&quot;, &quot;homepage&quot;, Confidence.HIGHEST);</span>
+<span class="fc" id="L158">            addStringEvidence(vendor, contents, blockVariable, &quot;license&quot;, &quot;licen[cs]es?&quot;, Confidence.HIGHEST);</span>
+
+<span class="fc" id="L160">            final String value = addStringEvidence(dependency.getVersionEvidence(), contents,</span>
+                    blockVariable, &quot;version&quot;, &quot;version&quot;, Confidence.HIGHEST);
+<span class="pc bpc" id="L162" title="1 of 2 branches missed.">            if (value.length() &lt; 1) {</span>
+<span class="nc" id="L163">                addEvidenceFromVersionFile(dependency.getActualFile(), dependency.getVersionEvidence());</span>
+            }
+        }
+
+<span class="fc" id="L167">        setPackagePath(dependency);</span>
+<span class="fc" id="L168">    }</span>
+
+    /**
+     * Adds the specified evidence to the given evidence collection.
+     *
+     * @param evidences the collection to add the evidence to
+     * @param contents the evidence contents
+     * @param blockVariable the variable
+     * @param field the field
+     * @param fieldPattern the field pattern
+     * @param confidence the confidence of the evidence
+     * @return the evidence string value added
+     */
+    private String addStringEvidence(EvidenceCollection evidences, String contents,
+            String blockVariable, String field, String fieldPattern, Confidence confidence) {
+<span class="fc" id="L183">        String value = &quot;&quot;;</span>
+
+        //capture array value between [ ]
+<span class="fc" id="L186">        final Matcher arrayMatcher = Pattern.compile(</span>
+                String.format(&quot;\\s*?%s\\.%s\\s*?=\\s*?\\[(.*?)\\]&quot;, blockVariable, fieldPattern), Pattern.CASE_INSENSITIVE).matcher(contents);
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (arrayMatcher.find()) {</span>
+<span class="fc" id="L189">            final String arrayValue = arrayMatcher.group(1);</span>
+<span class="fc" id="L190">            value = arrayValue.replaceAll(&quot;['\&quot;]&quot;, &quot;&quot;).trim(); //strip quotes</span>
+<span class="fc" id="L191">        } else { //capture single value between quotes</span>
+<span class="fc" id="L192">            final Matcher matcher = Pattern.compile(</span>
+                    String.format(&quot;\\s*?%s\\.%s\\s*?=\\s*?(['\&quot;])(.*?)\\1&quot;, blockVariable, fieldPattern), Pattern.CASE_INSENSITIVE).matcher(contents);
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (matcher.find()) {</span>
+<span class="fc" id="L195">                value = matcher.group(2);</span>
+            }
+        }
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        if (value.length() &gt; 0) {</span>
+<span class="fc" id="L199">            evidences.addEvidence(GEMSPEC, field, value, confidence);</span>
+        }
+
+<span class="fc" id="L202">        return value;</span>
+    }
+
+    /**
+     * Adds evidence from the version file.
+     *
+     * @param dependencyFile the dependency being analyzed
+     * @param versionEvidences the version evidence
+     */
+    private void addEvidenceFromVersionFile(File dependencyFile, EvidenceCollection versionEvidences) {
+<span class="nc" id="L212">        final File parentDir = dependencyFile.getParentFile();</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (parentDir != null) {</span>
+<span class="nc" id="L214">            final File[] matchingFiles = parentDir.listFiles(new FilenameFilter() {</span>
+                @Override
+                public boolean accept(File dir, String name) {
+<span class="nc" id="L217">                    return name.contains(VERSION_FILE_NAME);</span>
+                }
+            });
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (matchingFiles == null) {</span>
+<span class="nc" id="L221">                return;</span>
+            }
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            for (File f : matchingFiles) {</span>
+                try {
+<span class="nc" id="L225">                    final List&lt;String&gt; lines = FileUtils.readLines(f, Charset.defaultCharset());</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                    if (lines.size() == 1) { //TODO other checking?</span>
+<span class="nc" id="L227">                        final String value = lines.get(0).trim();</span>
+<span class="nc" id="L228">                        versionEvidences.addEvidence(GEMSPEC, &quot;version&quot;, value, Confidence.HIGH);</span>
+                    }
+<span class="nc" id="L230">                } catch (IOException e) {</span>
+<span class="nc" id="L231">                    LOGGER.debug(&quot;Error reading gemspec&quot;, e);</span>
+<span class="nc" id="L232">                }</span>
+            }
+        }
+<span class="nc" id="L235">    }</span>
+
+    /**
+     * Sets the package path on the dependency.
+     *
+     * @param dep the dependency to alter
+     */
+    private void setPackagePath(Dependency dep) {
+<span class="fc" id="L243">        final File file = new File(dep.getFilePath());</span>
+<span class="fc" id="L244">        final String parent = file.getParent();</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L246">            dep.setPackagePath(parent);</span>
+        }
+<span class="fc" id="L248">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

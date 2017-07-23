@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FieldAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.lucene</a> &gt; <span class="el_source">FieldAnalyzer.java</span></div><h1>FieldAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.lucene;
+
+import java.io.Reader;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.Tokenizer;
+import org.apache.lucene.analysis.core.LowerCaseFilter;
+import org.apache.lucene.analysis.core.StopAnalyzer;
+import org.apache.lucene.analysis.core.StopFilter;
+import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter;
+import org.apache.lucene.util.Version;
+
+/**
+ * &lt;p&gt;
+ * A Lucene Analyzer that utilizes the WhitespaceTokenizer, WordDelimiterFilter,
+ * LowerCaseFilter, and StopFilter. The intended purpose of this Analyzer is to
+ * index the CPE fields vendor and product.&lt;/p&gt;
+ *
+ * @author Jeremy Long
+ * @deprecated the field analyzer should not be used, instead use the
+ * SearchFieldAnalyzer so that the token analyzing filter is used.
+ */
+@Deprecated
+public class FieldAnalyzer extends Analyzer {
+
+    /**
+     * The Lucene Version used.
+     */
+    private final Version version;
+
+    /**
+     * Creates a new FieldAnalyzer.
+     *
+     * @param version the Lucene version
+     */
+<span class="fc" id="L53">    public FieldAnalyzer(Version version) {</span>
+<span class="fc" id="L54">        this.version = version;</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Creates the TokenStreamComponents
+     *
+     * @param fieldName the field name being analyzed
+     * @param reader the reader containing the input
+     * @return the TokenStreamComponents
+     */
+    @Override
+    protected TokenStreamComponents createComponents(String fieldName, Reader reader) {
+<span class="fc" id="L66">        final Tokenizer source = new AlphaNumericTokenizer(version, reader);</span>
+
+<span class="fc" id="L68">        TokenStream stream = source;</span>
+
+<span class="fc" id="L70">        stream = new WordDelimiterFilter(stream,</span>
+                WordDelimiterFilter.CATENATE_WORDS
+                | WordDelimiterFilter.GENERATE_WORD_PARTS
+                | WordDelimiterFilter.GENERATE_NUMBER_PARTS
+                | WordDelimiterFilter.PRESERVE_ORIGINAL
+                | WordDelimiterFilter.SPLIT_ON_CASE_CHANGE
+                | WordDelimiterFilter.SPLIT_ON_NUMERICS
+                | WordDelimiterFilter.STEM_ENGLISH_POSSESSIVE, null);
+
+<span class="fc" id="L79">        stream = new LowerCaseFilter(version, stream);</span>
+<span class="fc" id="L80">        stream = new StopFilter(version, stream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);</span>
+
+<span class="fc" id="L82">        return new TokenStreamComponents(source, stream);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

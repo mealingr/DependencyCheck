@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ComposerDependency.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.composer</a> &gt; <span class="el_source">ComposerDependency.java</span></div><h1>ComposerDependency.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2015 The OWASP Foundation. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.composer;
+
+/**
+ * Represents a dependency (GAV, right now) from a Composer dependency.
+ *
+ * @author colezlaw
+ */
+public final class ComposerDependency {
+
+    /**
+     * The group
+     */
+    private final String group;
+
+    /**
+     * The project
+     */
+    private final String project;
+
+    /**
+     * The version
+     */
+    private final String version;
+
+    /**
+     * Create a ComposerDependency from group, project, and version.
+     *
+     * @param group the group
+     * @param project the project
+     * @param version the version
+     */
+<span class="fc" id="L49">    public ComposerDependency(String group, String project, String version) {</span>
+<span class="fc" id="L50">        this.group = group;</span>
+<span class="fc" id="L51">        this.project = project;</span>
+<span class="fc" id="L52">        this.version = version;</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Get the group.
+     *
+     * @return the group
+     */
+    public String getGroup() {
+<span class="fc" id="L61">        return group;</span>
+    }
+
+    /**
+     * Get the project.
+     *
+     * @return the project
+     */
+    public String getProject() {
+<span class="fc" id="L70">        return project;</span>
+    }
+
+    /**
+     * Get the version.
+     *
+     * @return the version
+     */
+    public String getVersion() {
+<span class="fc" id="L79">        return version;</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L85">            return true;</span>
+        }
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (!(o instanceof ComposerDependency)) {</span>
+<span class="nc" id="L88">            return false;</span>
+        }
+
+<span class="fc" id="L91">        final ComposerDependency that = (ComposerDependency) o;</span>
+
+<span class="pc bpc" id="L93" title="3 of 6 branches missed.">        if (group != null ? !group.equals(that.group) : that.group != null) {</span>
+<span class="fc" id="L94">            return false;</span>
+        }
+<span class="pc bpc" id="L96" title="3 of 6 branches missed.">        if (project != null ? !project.equals(that.project) : that.project != null) {</span>
+<span class="fc" id="L97">            return false;</span>
+        }
+<span class="pc bpc" id="L99" title="4 of 6 branches missed.">        return !(version != null ? !version.equals(that.version) : that.version != null);</span>
+
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        int result = group != null ? group.hashCode() : 0;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        result = 31 * result + (project != null ? project.hashCode() : 0);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        result = 31 * result + (version != null ? version.hashCode() : 0);</span>
+<span class="nc" id="L108">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

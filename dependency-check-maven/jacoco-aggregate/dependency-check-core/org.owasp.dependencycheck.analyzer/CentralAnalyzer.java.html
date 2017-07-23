@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CentralAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">CentralAnalyzer.java</span></div><h1>CentralAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2014 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import org.apache.commons.io.FileUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.data.central.CentralSearch;
+import org.owasp.dependencycheck.data.nexus.MavenArtifact;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.Evidence;
+import org.owasp.dependencycheck.xml.pom.PomUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileFilter;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.List;
+import org.owasp.dependencycheck.exception.InitializationException;
+import org.owasp.dependencycheck.utils.DownloadFailedException;
+import org.owasp.dependencycheck.utils.Downloader;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.InvalidSettingException;
+import org.owasp.dependencycheck.utils.Settings;
+
+/**
+ * Analyzer which will attempt to locate a dependency, and the GAV information,
+ * by querying Central for the dependency's SHA-1 digest.
+ *
+ * @author colezlaw
+ */
+<span class="fc" id="L52">public class CentralAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L57">    private static final Logger LOGGER = LoggerFactory.getLogger(CentralAnalyzer.class);</span>
+
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;Central Analyzer&quot;;
+
+    /**
+     * The phase in which this analyzer runs.
+     */
+<span class="fc" id="L67">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.INFORMATION_COLLECTION;</span>
+
+    /**
+     * The types of files on which this will work.
+     */
+    private static final String SUPPORTED_EXTENSIONS = &quot;jar&quot;;
+
+    /**
+     * The analyzer should be disabled if there are errors, so this is a flag to
+     * determine if such an error has occurred.
+     */
+<span class="fc" id="L78">    private volatile boolean errorFlag = false;</span>
+
+    /**
+     * The searcher itself.
+     */
+    private CentralSearch searcher;
+    /**
+     * Field indicating if the analyzer is enabled.
+     */
+<span class="fc" id="L87">    private final boolean enabled = checkEnabled();</span>
+
+    /**
+     * Determine whether to enable this analyzer or not.
+     *
+     * @return whether the analyzer should be enabled
+     */
+    @Override
+    public boolean isEnabled() {
+<span class="fc" id="L96">        return enabled;</span>
+    }
+
+    /**
+     * Determines if this analyzer is enabled.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if the analyzer is enabled; otherwise
+     * &lt;code&gt;false&lt;/code&gt;
+     */
+    private boolean checkEnabled() {
+<span class="fc" id="L106">        boolean retVal = false;</span>
+
+        try {
+<span class="fc bfc" id="L109" title="All 2 branches covered.">            if (Settings.getBoolean(Settings.KEYS.ANALYZER_CENTRAL_ENABLED)) {</span>
+<span class="pc bpc" id="L110" title="3 of 4 branches missed.">                if (!Settings.getBoolean(Settings.KEYS.ANALYZER_NEXUS_ENABLED)</span>
+                        || NexusAnalyzer.DEFAULT_URL.equals(Settings.getString(Settings.KEYS.ANALYZER_NEXUS_URL))) {
+<span class="fc" id="L112">                    LOGGER.debug(&quot;Enabling the Central analyzer&quot;);</span>
+<span class="fc" id="L113">                    retVal = true;</span>
+                } else {
+<span class="nc" id="L115">                    LOGGER.info(&quot;Nexus analyzer is enabled, disabling the Central Analyzer&quot;);</span>
+                }
+            } else {
+<span class="fc" id="L118">                LOGGER.info(&quot;Central analyzer disabled&quot;);</span>
+            }
+<span class="nc" id="L120">        } catch (InvalidSettingException ise) {</span>
+<span class="nc" id="L121">            LOGGER.warn(&quot;Invalid setting. Disabling the Central analyzer&quot;);</span>
+<span class="fc" id="L122">        }</span>
+<span class="fc" id="L123">        return retVal;</span>
+    }
+
+    /**
+     * Initializes the analyzer once before any analysis is performed.
+     *
+     * @throws InitializationException if there's an error during initialization
+     */
+    @Override
+    public void initializeFileTypeAnalyzer() throws InitializationException {
+<span class="fc" id="L133">        LOGGER.debug(&quot;Initializing Central analyzer&quot;);</span>
+<span class="fc" id="L134">        LOGGER.debug(&quot;Central analyzer enabled: {}&quot;, isEnabled());</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (isEnabled()) {</span>
+<span class="fc" id="L136">            final String searchUrl = Settings.getString(Settings.KEYS.ANALYZER_CENTRAL_URL);</span>
+<span class="fc" id="L137">            LOGGER.debug(&quot;Central Analyzer URL: {}&quot;, searchUrl);</span>
+            try {
+<span class="fc" id="L139">                searcher = new CentralSearch(new URL(searchUrl));</span>
+<span class="nc" id="L140">            } catch (MalformedURLException ex) {</span>
+<span class="nc" id="L141">                setEnabled(false);</span>
+<span class="nc" id="L142">                throw new InitializationException(&quot;The configured URL to Maven Central is malformed: &quot; + searchUrl, ex);</span>
+<span class="fc" id="L143">            }</span>
+        }
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Returns the analyzer's name.
+     *
+     * @return the name of the analyzer
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L154">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the key used in the properties file to to reference the
+     * analyzer's enabled property.
+     *
+     * @return the analyzer's enabled property setting key.
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L165">        return Settings.KEYS.ANALYZER_CENTRAL_ENABLED;</span>
+    }
+
+    /**
+     * Returns the analysis phase under which the analyzer runs.
+     *
+     * @return the phase under which the analyzer runs
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L175">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * The file filter used to determine which files this analyzer supports.
+     */
+<span class="fc" id="L181">    private static final FileFilter FILTER = FileFilterBuilder.newInstance().addExtensions(SUPPORTED_EXTENSIONS).build();</span>
+
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L185">        return FILTER;</span>
+    }
+
+    /**
+     * Performs the analysis.
+     *
+     * @param dependency the dependency to analyze
+     * @param engine the engine
+     * @throws AnalysisException when there's an exception during analysis
+     */
+    @Override
+    public void analyzeDependency(Dependency dependency, Engine engine) throws AnalysisException {
+<span class="pc bpc" id="L197" title="2 of 4 branches missed.">        if (errorFlag || !isEnabled()) {</span>
+<span class="nc" id="L198">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L202">            final List&lt;MavenArtifact&gt; mas = searcher.searchSha1(dependency.getSha1sum());</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            final Confidence confidence = mas.size() &gt; 1 ? Confidence.HIGH : Confidence.HIGHEST;</span>
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (MavenArtifact ma : mas) {</span>
+<span class="fc" id="L205">                LOGGER.debug(&quot;Central analyzer found artifact ({}) for dependency ({})&quot;, ma, dependency.getFileName());</span>
+<span class="fc" id="L206">                dependency.addAsEvidence(&quot;central&quot;, ma, confidence);</span>
+<span class="fc" id="L207">                boolean pomAnalyzed = false;</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                for (Evidence e : dependency.getVendorEvidence()) {</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">                    if (&quot;pom&quot;.equals(e.getSource())) {</span>
+<span class="fc" id="L210">                        pomAnalyzed = true;</span>
+<span class="fc" id="L211">                        break;</span>
+                    }
+<span class="fc" id="L213">                }</span>
+<span class="fc bfc" id="L214" title="All 4 branches covered.">                if (!pomAnalyzed &amp;&amp; ma.getPomUrl() != null) {</span>
+<span class="fc" id="L215">                    File pomFile = null;</span>
+                    try {
+<span class="fc" id="L217">                        final File baseDir = Settings.getTempDirectory();</span>
+<span class="fc" id="L218">                        pomFile = File.createTempFile(&quot;pom&quot;, &quot;.xml&quot;, baseDir);</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                        if (!pomFile.delete()) {</span>
+<span class="nc" id="L220">                            LOGGER.warn(&quot;Unable to fetch pom.xml for {} from Central; &quot;</span>
+                                    + &quot;this could result in undetected CPE/CVEs.&quot;, dependency.getFileName());
+<span class="nc" id="L222">                            LOGGER.debug(&quot;Unable to delete temp file&quot;);</span>
+                        }
+<span class="fc" id="L224">                        LOGGER.debug(&quot;Downloading {}&quot;, ma.getPomUrl());</span>
+<span class="fc" id="L225">                        Downloader.fetchFile(new URL(ma.getPomUrl()), pomFile);</span>
+<span class="fc" id="L226">                        PomUtils.analyzePOM(dependency, pomFile);</span>
+
+<span class="nc" id="L228">                    } catch (DownloadFailedException ex) {</span>
+<span class="nc" id="L229">                        LOGGER.warn(&quot;Unable to download pom.xml for {} from Central; &quot;</span>
+                                + &quot;this could result in undetected CPE/CVEs.&quot;, dependency.getFileName());
+                    } finally {
+<span class="pc bpc" id="L232" title="15 of 18 branches missed.">                        if (pomFile != null &amp;&amp; pomFile.exists() &amp;&amp; !FileUtils.deleteQuietly(pomFile)) {</span>
+<span class="nc" id="L233">                            LOGGER.debug(&quot;Failed to delete temporary pom file {}&quot;, pomFile.toString());</span>
+<span class="nc" id="L234">                            pomFile.deleteOnExit();</span>
+                        }
+                    }
+                }
+
+<span class="fc" id="L239">            }</span>
+<span class="nc" id="L240">        } catch (IllegalArgumentException iae) {</span>
+<span class="nc" id="L241">            LOGGER.info(&quot;invalid sha1-hash on {}&quot;, dependency.getFileName());</span>
+<span class="fc" id="L242">        } catch (FileNotFoundException fnfe) {</span>
+<span class="fc" id="L243">            LOGGER.debug(&quot;Artifact not found in repository: '{}&quot;, dependency.getFileName());</span>
+<span class="nc" id="L244">        } catch (IOException ioe) {</span>
+<span class="nc" id="L245">            LOGGER.debug(&quot;Could not connect to Central search&quot;, ioe);</span>
+<span class="nc" id="L246">            errorFlag = true;</span>
+<span class="pc" id="L247">        }</span>
+<span class="fc" id="L248">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NvdCve20Handler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.update.nvd</a> &gt; <span class="el_source">NvdCve20Handler.java</span></div><h1>NvdCve20Handler.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.update.nvd;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import org.apache.lucene.index.CorruptIndexException;
+import org.owasp.dependencycheck.data.nvdcve.CveDB;
+import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
+import org.owasp.dependencycheck.dependency.Reference;
+import org.owasp.dependencycheck.dependency.Vulnerability;
+import org.owasp.dependencycheck.dependency.VulnerableSoftware;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.Attributes;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXNotSupportedException;
+import org.xml.sax.helpers.DefaultHandler;
+
+import static org.owasp.dependencycheck.data.update.nvd.NvdCve20Handler.AttributeValues.*;
+
+/**
+ * A SAX Handler that will parse the NVD CVE XML (schema version 2.0).
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L43">public class NvdCve20Handler extends DefaultHandler {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(NvdCve20Handler.class);</span>
+    /**
+     * the current supported schema version.
+     */
+    private static final String CURRENT_SCHEMA_VERSION = &quot;2.0&quot;;
+    /**
+     * a possible attribute value of the {@link AttributeValues#XML_LANG}
+     * attribute
+     */
+    private static final String EN = &quot;en&quot;;
+    /**
+     * the prefix of the node text of a CPE
+     */
+    private static final String CPE_NODE_TEXT_PREFIX = &quot;cpe:/a:&quot;;
+    /**
+     * the node text of an entry marked for deletion
+     */
+    private static final String REJECT_NODE_TEXT = &quot;** REJECT **&quot;;
+    /**
+     * the current element.
+     */
+<span class="fc" id="L69">    private final Element current = new Element();</span>
+    /**
+     * the text of the node.
+     */
+    private StringBuilder nodeText;
+    /**
+     * the vulnerability.
+     */
+    private Vulnerability vulnerability;
+    /**
+     * a reference for the cve.
+     */
+    private Reference reference;
+    /**
+     * flag indicating whether the application has a cpe.
+     */
+<span class="fc" id="L85">    private boolean hasApplicationCpe = false;</span>
+    /**
+     * The total number of entries parsed.
+     */
+    private int totalNumberOfEntries;
+
+    /**
+     * The total number of application entries parsed.
+     */
+    private int totalNumberOfApplicationEntries;
+    /**
+     * the cve database.
+     */
+    private CveDB cveDB;
+
+    /**
+     * A list of CVE entries and associated VulnerableSoftware entries that
+     * contain previous entries.
+     */
+    private Map&lt;String, List&lt;VulnerableSoftware&gt;&gt; prevVersionVulnMap;
+
+    /**
+     * Get the value of totalNumberOfEntries.
+     *
+     * @return the value of totalNumberOfEntries
+     */
+    public int getTotalNumberOfEntries() {
+<span class="fc" id="L112">        return totalNumberOfEntries;</span>
+    }
+
+    /**
+     * Get the value of totalNumberOfApplicationEntries.
+     *
+     * @return the value of totalNumberOfApplicationEntries
+     */
+    public int getTotalNumberOfApplicationEntries() {
+<span class="nc" id="L121">        return totalNumberOfApplicationEntries;</span>
+    }
+
+    @Override
+    public void startElement(String uri, String localName, String qName, Attributes attributes) throws SAXException {
+<span class="fc" id="L126">        current.setNode(qName);</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">        if (current.isEntryNode()) {</span>
+<span class="fc" id="L128">            hasApplicationCpe = false;</span>
+<span class="fc" id="L129">            vulnerability = new Vulnerability();</span>
+<span class="fc" id="L130">            vulnerability.setName(attributes.getValue(ID));</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        } else if (current.isVulnProductNode()) {</span>
+<span class="fc" id="L132">            nodeText = new StringBuilder(100);</span>
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        } else if (current.isVulnReferencesNode()) {</span>
+<span class="fc" id="L134">            final String lang = attributes.getValue(XML_LANG);</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">            if (EN.equals(lang)) {</span>
+<span class="fc" id="L136">                reference = new Reference();</span>
+            } else {
+<span class="nc" id="L138">                reference = null;</span>
+            }
+<span class="fc bfc" id="L140" title="All 4 branches covered.">        } else if (reference != null &amp;&amp; current.isVulnReferenceNode()) {</span>
+<span class="fc" id="L141">            reference.setUrl(attributes.getValue(HREF));</span>
+<span class="fc" id="L142">            nodeText = new StringBuilder(130);</span>
+<span class="pc bpc" id="L143" title="1 of 4 branches missed.">        } else if (reference != null &amp;&amp; current.isVulnSourceNode()) {</span>
+<span class="fc" id="L144">            nodeText = new StringBuilder(30);</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        } else if (current.isVulnSummaryNode()) {</span>
+<span class="fc" id="L146">            nodeText = new StringBuilder(500);</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        } else if (current.isNVDNode()) {</span>
+<span class="fc" id="L148">            final String nvdVer = attributes.getValue(NVD_XML_VERSION);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">            if (!CURRENT_SCHEMA_VERSION.equals(nvdVer)) {</span>
+<span class="nc" id="L150">                throw new SAXNotSupportedException(&quot;Schema version &quot; + nvdVer + &quot; is not supported&quot;);</span>
+            }
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        } else if (current.isVulnCWENode()) {</span>
+<span class="fc" id="L153">            vulnerability.setCwe(attributes.getValue(ID));</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        } else if (current.isCVSSScoreNode()) {</span>
+<span class="fc" id="L155">            nodeText = new StringBuilder(5);</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        } else if (current.isCVSSAccessVectorNode()) {</span>
+<span class="fc" id="L157">            nodeText = new StringBuilder(20);</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        } else if (current.isCVSSAccessComplexityNode()) {</span>
+<span class="fc" id="L159">            nodeText = new StringBuilder(20);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        } else if (current.isCVSSAuthenticationNode()) {</span>
+<span class="fc" id="L161">            nodeText = new StringBuilder(20);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        } else if (current.isCVSSAvailabilityImpactNode()) {</span>
+<span class="fc" id="L163">            nodeText = new StringBuilder(20);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        } else if (current.isCVSSConfidentialityImpactNode()) {</span>
+<span class="fc" id="L165">            nodeText = new StringBuilder(20);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        } else if (current.isCVSSIntegrityImpactNode()) {</span>
+<span class="fc" id="L167">            nodeText = new StringBuilder(20);</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    @Override
+    public void characters(char[] ch, int start, int length) throws SAXException {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (nodeText != null) {</span>
+<span class="fc" id="L174">            nodeText.append(ch, start, length);</span>
+        }
+<span class="fc" id="L176">    }</span>
+
+    @Override
+    public void endElement(String uri, String localName, String qName) throws SAXException {
+<span class="fc" id="L180">        current.setNode(qName);</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (current.isEntryNode()) {</span>
+<span class="fc" id="L182">            totalNumberOfEntries += 1;</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (hasApplicationCpe) {</span>
+<span class="fc" id="L184">                totalNumberOfApplicationEntries += 1;</span>
+                try {
+<span class="fc" id="L186">                    saveEntry(vulnerability);</span>
+<span class="nc" id="L187">                } catch (DatabaseException | CorruptIndexException ex) {</span>
+<span class="nc" id="L188">                    throw new SAXException(ex);</span>
+<span class="nc" id="L189">                } catch (IOException ex) {</span>
+<span class="nc" id="L190">                    throw new SAXException(ex);</span>
+<span class="fc" id="L191">                }</span>
+            }
+<span class="fc" id="L193">            vulnerability = null;</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        } else if (current.isCVSSScoreNode()) {</span>
+            try {
+<span class="fc" id="L196">                final float score = Float.parseFloat(nodeText.toString());</span>
+<span class="fc" id="L197">                vulnerability.setCvssScore(score);</span>
+<span class="nc" id="L198">            } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L199">                LOGGER.error(&quot;Error parsing CVSS Score.&quot;);</span>
+<span class="nc" id="L200">                LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="fc" id="L201">            }</span>
+<span class="fc" id="L202">            nodeText = null;</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        } else if (current.isCVSSAccessVectorNode()) {</span>
+<span class="fc" id="L204">            vulnerability.setCvssAccessVector(nodeText.toString());</span>
+<span class="fc" id="L205">            nodeText = null;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        } else if (current.isCVSSAccessComplexityNode()) {</span>
+<span class="fc" id="L207">            vulnerability.setCvssAccessComplexity(nodeText.toString());</span>
+<span class="fc" id="L208">            nodeText = null;</span>
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        } else if (current.isCVSSAuthenticationNode()) {</span>
+<span class="fc" id="L210">            vulnerability.setCvssAuthentication(nodeText.toString());</span>
+<span class="fc" id="L211">            nodeText = null;</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        } else if (current.isCVSSAvailabilityImpactNode()) {</span>
+<span class="fc" id="L213">            vulnerability.setCvssAvailabilityImpact(nodeText.toString());</span>
+<span class="fc" id="L214">            nodeText = null;</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        } else if (current.isCVSSConfidentialityImpactNode()) {</span>
+<span class="fc" id="L216">            vulnerability.setCvssConfidentialityImpact(nodeText.toString());</span>
+<span class="fc" id="L217">            nodeText = null;</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        } else if (current.isCVSSIntegrityImpactNode()) {</span>
+<span class="fc" id="L219">            vulnerability.setCvssIntegrityImpact(nodeText.toString());</span>
+<span class="fc" id="L220">            nodeText = null;</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        } else if (current.isVulnProductNode()) {</span>
+<span class="fc" id="L222">            final String cpe = nodeText.toString();</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (cpe.startsWith(CPE_NODE_TEXT_PREFIX)) {</span>
+<span class="fc" id="L224">                hasApplicationCpe = true;</span>
+<span class="fc" id="L225">                vulnerability.addVulnerableSoftware(cpe);</span>
+            }
+<span class="fc" id="L227">            nodeText = null;</span>
+<span class="fc bfc" id="L228" title="All 4 branches covered.">        } else if (reference != null &amp;&amp; current.isVulnReferencesNode()) {</span>
+<span class="fc" id="L229">            vulnerability.addReference(reference);</span>
+<span class="fc" id="L230">            reference = null;</span>
+<span class="fc bfc" id="L231" title="All 4 branches covered.">        } else if (reference != null &amp;&amp; current.isVulnReferenceNode()) {</span>
+<span class="fc" id="L232">            reference.setName(nodeText.toString());</span>
+<span class="fc" id="L233">            nodeText = null;</span>
+<span class="pc bpc" id="L234" title="1 of 4 branches missed.">        } else if (reference != null &amp;&amp; current.isVulnSourceNode()) {</span>
+<span class="fc" id="L235">            reference.setSource(nodeText.toString());</span>
+<span class="fc" id="L236">            nodeText = null;</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        } else if (current.isVulnSummaryNode()) {</span>
+<span class="fc" id="L238">            vulnerability.setDescription(nodeText.toString());</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (nodeText.indexOf(REJECT_NODE_TEXT) &gt;= 0) {</span>
+<span class="fc" id="L240">                hasApplicationCpe = true; //ensure we process this to delete the vuln</span>
+            }
+<span class="fc" id="L242">            nodeText = null;</span>
+        }
+<span class="fc" id="L244">    }</span>
+
+    /**
+     * Sets the cveDB.
+     *
+     * @param db a reference to the CveDB
+     */
+    public void setCveDB(CveDB db) {
+<span class="fc" id="L252">        cveDB = db;</span>
+<span class="fc" id="L253">    }</span>
+
+    /**
+     * Sets the prevVersionVulnMap.
+     *
+     * @param map the map of vulnerable software with previous versions being
+     * vulnerable
+     */
+    public void setPrevVersionVulnMap(Map&lt;String, List&lt;VulnerableSoftware&gt;&gt; map) {
+<span class="fc" id="L262">        prevVersionVulnMap = map;</span>
+<span class="fc" id="L263">    }</span>
+
+    /**
+     * Saves a vulnerability to the CVE Database.
+     *
+     * @param vuln the vulnerability to store in the database
+     * @throws DatabaseException thrown if there is an error writing to the
+     * database
+     * @throws CorruptIndexException is thrown if the CPE Index is corrupt
+     * @throws IOException thrown if there is an IOException with the CPE Index
+     */
+    private void saveEntry(Vulnerability vuln) throws DatabaseException, CorruptIndexException, IOException {
+<span class="fc" id="L275">        final String cveName = vuln.getName();</span>
+<span class="fc bfc" id="L276" title="All 4 branches covered.">        if (prevVersionVulnMap != null &amp;&amp; prevVersionVulnMap.containsKey(cveName)) {</span>
+<span class="fc" id="L277">            final List&lt;VulnerableSoftware&gt; vulnSoftware = prevVersionVulnMap.get(cveName);</span>
+<span class="fc bfc" id="L278" title="All 2 branches covered.">            for (VulnerableSoftware vs : vulnSoftware) {</span>
+<span class="fc" id="L279">                vuln.updateVulnerableSoftware(vs);</span>
+<span class="fc" id="L280">            }</span>
+        }
+<span class="fc bfc" id="L282" title="All 2 branches covered.">        if (cveDB != null) {</span>
+<span class="fc" id="L283">            cveDB.updateVulnerability(vuln);</span>
+        }
+<span class="fc" id="L285">    }</span>
+
+    // &lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;The Element Class that maintains state information about the current node&quot;&gt;
+    /**
+     * A simple class to maintain information about the current element while
+     * parsing the NVD CVE XML.
+     */
+<span class="fc" id="L292">    protected static class Element {</span>
+
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String NVD = &quot;nvd&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String ENTRY = &quot;entry&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_PRODUCT = &quot;vuln:product&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_REFERENCES = &quot;vuln:references&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_SOURCE = &quot;vuln:source&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_REFERENCE = &quot;vuln:reference&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_SUMMARY = &quot;vuln:summary&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String VULN_CWE = &quot;vuln:cwe&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_SCORE = &quot;cvss:score&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_ACCESS_VECTOR = &quot;cvss:access-vector&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_ACCESS_COMPLEXITY = &quot;cvss:access-complexity&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_AUTHENTICATION = &quot;cvss:authentication&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_CONFIDENTIALITY_IMPACT = &quot;cvss:confidentiality-impact&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_INTEGRITY_IMPACT = &quot;cvss:integrity-impact&quot;;
+        /**
+         * A node type in the NVD CVE Schema 2.0
+         */
+        public static final String CVSS_AVAILABILITY_IMPACT = &quot;cvss:availability-impact&quot;;
+        /**
+         * The current node.
+         */
+        private String node;
+
+        /**
+         * Gets the value of node.
+         *
+         * @return the value of node
+         */
+        public String getNode() {
+<span class="nc" id="L365">            return this.node;</span>
+        }
+
+        /**
+         * Sets the value of node.
+         *
+         * @param node new value of node
+         */
+        public void setNode(String node) {
+<span class="fc" id="L374">            this.node = node;</span>
+<span class="fc" id="L375">        }</span>
+
+        /**
+         * Checks if the handler is at the NVD node.
+         *
+         * @return true or false
+         */
+        public boolean isNVDNode() {
+<span class="fc" id="L383">            return NVD.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the ENTRY node.
+         *
+         * @return true or false
+         */
+        public boolean isEntryNode() {
+<span class="fc" id="L392">            return ENTRY.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the VULN_PRODUCT node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnProductNode() {
+<span class="fc" id="L401">            return VULN_PRODUCT.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the REFERENCES node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnReferencesNode() {
+<span class="fc" id="L410">            return VULN_REFERENCES.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the REFERENCE node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnReferenceNode() {
+<span class="fc" id="L419">            return VULN_REFERENCE.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the VULN_SOURCE node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnSourceNode() {
+<span class="fc" id="L428">            return VULN_SOURCE.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the VULN_SUMMARY node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnSummaryNode() {
+<span class="fc" id="L437">            return VULN_SUMMARY.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the VULN_CWE node.
+         *
+         * @return true or false
+         */
+        public boolean isVulnCWENode() {
+<span class="fc" id="L446">            return VULN_CWE.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_SCORE node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSScoreNode() {
+<span class="fc" id="L455">            return CVSS_SCORE.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_ACCESS_VECTOR node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSAccessVectorNode() {
+<span class="fc" id="L464">            return CVSS_ACCESS_VECTOR.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_ACCESS_COMPLEXITY node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSAccessComplexityNode() {
+<span class="fc" id="L473">            return CVSS_ACCESS_COMPLEXITY.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_AUTHENTICATION node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSAuthenticationNode() {
+<span class="fc" id="L482">            return CVSS_AUTHENTICATION.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_CONFIDENTIALITY_IMPACT node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSConfidentialityImpactNode() {
+<span class="fc" id="L491">            return CVSS_CONFIDENTIALITY_IMPACT.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_INTEGRITY_IMPACT node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSIntegrityImpactNode() {
+<span class="fc" id="L500">            return CVSS_INTEGRITY_IMPACT.equals(node);</span>
+        }
+
+        /**
+         * Checks if the handler is at the CVSS_AVAILABILITY_IMPACT node.
+         *
+         * @return true or false
+         */
+        public boolean isCVSSAvailabilityImpactNode() {
+<span class="fc" id="L509">            return CVSS_AVAILABILITY_IMPACT.equals(node);</span>
+        }
+    }
+    // &lt;/editor-fold&gt;
+
+    /**
+     * A simple class to maintain information about the attribute values
+     * encountered while parsing the NVD CVE XML.
+     */
+<span class="pc" id="L518">    protected static class AttributeValues {</span>
+
+        /**
+         * An attribute in the NVD CVE Schema 2.0
+         */
+        protected static final String ID = &quot;id&quot;;
+        /**
+         * An attribute in the NVD CVE Schema 2.0
+         */
+        protected static final String XML_LANG = &quot;xml:lang&quot;;
+        /**
+         * An attribute in the NVD CVE Schema 2.0
+         */
+        protected static final String HREF = &quot;href&quot;;
+        /**
+         * An attribute in the NVD CVE Schema 2.0
+         */
+        protected static final String NVD_XML_VERSION = &quot;nvd_xml_version&quot;;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

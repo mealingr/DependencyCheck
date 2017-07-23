@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AnalysisTask.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck</a> &gt; <span class="el_source">AnalysisTask.java</span></div><h1>AnalysisTask.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2016 Stefan Neuhaus. All Rights Reserved.
+ */
+package org.owasp.dependencycheck;
+
+import org.owasp.dependencycheck.analyzer.Analyzer;
+import org.owasp.dependencycheck.analyzer.FileTypeAnalyzer;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.concurrent.Callable;
+
+/**
+ * Task to support parallelism of dependency-check analysis. Analyses a single
+ * {@link Dependency} by a specific {@link Analyzer}.
+ *
+ * @author Stefan Neuhaus
+ */
+public class AnalysisTask implements Callable&lt;Void&gt; {
+
+    /**
+     * Instance of the logger.
+     */
+<span class="fc" id="L42">    private static final Logger LOGGER = LoggerFactory.getLogger(AnalysisTask.class);</span>
+
+    /**
+     * A reference to the analyzer.
+     */
+    private final Analyzer analyzer;
+    /**
+     * The dependency to analyze.
+     */
+    private final Dependency dependency;
+    /**
+     * A reference to the dependency-check engine.
+     */
+    private final Engine engine;
+    /**
+     * The list of exceptions that may occur during analysis.
+     */
+    private final List&lt;Throwable&gt; exceptions;
+    /**
+     * A reference to the global settings object.
+     */
+    private final Settings settings;
+
+    /**
+     * Creates a new analysis task.
+     *
+     * @param analyzer a reference of the analyzer to execute
+     * @param dependency the dependency to analyze
+     * @param engine the dependency-check engine
+     * @param exceptions exceptions that occur during analysis will be added to
+     * this collection of exceptions
+     * @param settings a reference to the global settings object; this is
+     * necessary so that when the thread is started the dependencies have a
+     * correct reference to the global settings.
+     */
+<span class="fc" id="L77">    AnalysisTask(Analyzer analyzer, Dependency dependency, Engine engine, List&lt;Throwable&gt; exceptions, Settings settings) {</span>
+<span class="fc" id="L78">        this.analyzer = analyzer;</span>
+<span class="fc" id="L79">        this.dependency = dependency;</span>
+<span class="fc" id="L80">        this.engine = engine;</span>
+<span class="fc" id="L81">        this.exceptions = exceptions;</span>
+<span class="fc" id="L82">        this.settings = settings;</span>
+<span class="fc" id="L83">    }</span>
+
+    /**
+     * Executes the analysis task.
+     *
+     * @return null
+     */
+    @Override
+    public Void call() {
+        try {
+<span class="fc" id="L93">            Settings.setInstance(settings);</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (shouldAnalyze()) {</span>
+<span class="fc" id="L96">                LOGGER.debug(&quot;Begin Analysis of '{}' ({})&quot;, dependency.getActualFilePath(), analyzer.getName());</span>
+                try {
+<span class="fc" id="L98">                    analyzer.analyze(dependency, engine);</span>
+<span class="nc" id="L99">                } catch (AnalysisException ex) {</span>
+<span class="nc" id="L100">                    LOGGER.warn(&quot;An error occurred while analyzing '{}' ({}).&quot;, dependency.getActualFilePath(), analyzer.getName());</span>
+<span class="nc" id="L101">                    LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L102">                    exceptions.add(ex);</span>
+<span class="nc" id="L103">                } catch (Throwable ex) {</span>
+<span class="nc" id="L104">                    LOGGER.warn(&quot;An unexpected error occurred during analysis of '{}' ({}): {}&quot;,</span>
+                            dependency.getActualFilePath(), analyzer.getName(), ex.getMessage());
+<span class="nc" id="L106">                    LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L107">                    exceptions.add(ex);</span>
+<span class="pc" id="L108">                }</span>
+            }
+        } finally {
+<span class="pc" id="L111">            Settings.cleanup(false);</span>
+<span class="fc" id="L112">        }</span>
+<span class="fc" id="L113">        return null;</span>
+    }
+
+    /**
+     * Determines if the analyzer can analyze the given dependency.
+     *
+     * @return whether or not the analyzer can analyze the dependency
+     */
+    protected boolean shouldAnalyze() {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        if (analyzer instanceof FileTypeAnalyzer) {</span>
+<span class="fc" id="L123">            final FileTypeAnalyzer fileTypeAnalyzer = (FileTypeAnalyzer) analyzer;</span>
+<span class="fc" id="L124">            return fileTypeAnalyzer.accept(dependency.getActualFile());</span>
+        }
+
+<span class="fc" id="L127">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,1265 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BaseDependencyCheckMojo.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-maven</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.maven</a> &gt; <span class="el_source">BaseDependencyCheckMojo.java</span></div><h1>BaseDependencyCheckMojo.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-maven.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2014 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.maven;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import org.apache.maven.artifact.Artifact;
+import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.doxia.sink.Sink;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Component;
+import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.project.DefaultProjectBuildingRequest;
+import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.reporting.MavenReport;
+import org.apache.maven.reporting.MavenReportException;
+import org.apache.maven.settings.Proxy;
+import org.apache.maven.settings.Server;
+import org.apache.maven.shared.artifact.ArtifactCoordinate;
+import org.apache.maven.shared.artifact.TransferUtils;
+import org.apache.maven.shared.artifact.resolve.ArtifactResolver;
+import org.apache.maven.shared.artifact.resolve.ArtifactResolverException;
+import org.apache.maven.shared.dependency.graph.DependencyGraphBuilder;
+import org.apache.maven.shared.dependency.graph.DependencyGraphBuilderException;
+import org.apache.maven.shared.dependency.graph.DependencyNode;
+import org.apache.maven.shared.model.fileset.FileSet;
+import org.apache.maven.shared.model.fileset.util.FileSetManager;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.data.nexus.MavenArtifact;
+import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.Identifier;
+import org.owasp.dependencycheck.dependency.Vulnerability;
+import org.owasp.dependencycheck.exception.DependencyNotFoundException;
+import org.owasp.dependencycheck.exception.ExceptionCollection;
+import org.owasp.dependencycheck.utils.Filter;
+import org.owasp.dependencycheck.utils.Settings;
+import org.sonatype.plexus.components.sec.dispatcher.DefaultSecDispatcher;
+import org.sonatype.plexus.components.sec.dispatcher.SecDispatcher;
+import org.sonatype.plexus.components.sec.dispatcher.SecDispatcherException;
+
+/**
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L71">public abstract class BaseDependencyCheckMojo extends AbstractMojo implements MavenReport {</span>
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Private fields&quot;&gt;
+    /**
+     * The properties file location.
+     */
+    private static final String PROPERTIES_FILE = &quot;mojo.properties&quot;;
+    /**
+     * System specific new line character.
+     */
+<span class="fc" id="L81">    private static final String NEW_LINE = System.getProperty(&quot;line.separator&quot;, &quot;\n&quot;).intern();</span>
+    /**
+     * A flag indicating whether or not the Maven site is being generated.
+     */
+<span class="fc" id="L85">    private boolean generatingSite = false;</span>
+    //&lt;/editor-fold&gt;
+    // &lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Maven bound parameters and components&quot;&gt;
+    /**
+     * Sets whether or not the external report format should be used.
+     */
+    @Parameter(property = &quot;metaFileName&quot;, defaultValue = &quot;dependency-check.ser&quot;, required = true)
+    private String dataFileName;
+    /**
+     * Sets whether or not the external report format should be used.
+     */
+    @Parameter(property = &quot;failOnError&quot;, defaultValue = &quot;true&quot;, required = true)
+    private boolean failOnError;
+
+    /**
+     * The Maven Project Object.
+     */
+    @Parameter(property = &quot;project&quot;, required = true, readonly = true)
+    private MavenProject project;
+    /**
+     * List of Maven project of the current build
+     */
+    @Parameter(readonly = true, required = true, property = &quot;reactorProjects&quot;)
+    private List&lt;MavenProject&gt; reactorProjects;
+    /**
+     * The entry point towards a Maven version independent way of resolving
+     * artifacts (handles both Maven 3.0 Sonatype and Maven 3.1+ eclipse Aether
+     * implementations).
+     */
+    @Component
+    private ArtifactResolver artifactResolver;
+
+    /**
+     * The Maven Session.
+     */
+    @Parameter(defaultValue = &quot;${session}&quot;, readonly = true, required = true)
+    private MavenSession session;
+
+    /**
+     * Remote repositories which will be searched for artifacts.
+     */
+    @Parameter(defaultValue = &quot;${project.remoteArtifactRepositories}&quot;, readonly = true, required = true)
+    private List&lt;ArtifactRepository&gt; remoteRepositories;
+
+    /**
+     * Component within Maven to build the dependency graph.
+     */
+    @Component
+    private DependencyGraphBuilder dependencyGraphBuilder;
+
+    /**
+     * The output directory. This generally maps to &quot;target&quot;.
+     */
+    @Parameter(defaultValue = &quot;${project.build.directory}&quot;, required = true)
+    private File outputDirectory;
+    /**
+     * Specifies the destination directory for the generated Dependency-Check
+     * report. This generally maps to &quot;target/site&quot;.
+     */
+    @Parameter(property = &quot;project.reporting.outputDirectory&quot;, required = true)
+    private File reportOutputDirectory;
+    /**
+     * Specifies if the build should be failed if a CVSS score above a specified
+     * level is identified. The default is 11 which means since the CVSS scores
+     * are 0-10, by default the build will never fail.
+     */
+<span class="fc" id="L151">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;failBuildOnCVSS&quot;, defaultValue = &quot;11&quot;, required = true)
+    private float failBuildOnCVSS = 11;
+    /**
+     * Fail the build if any dependency has a vulnerability listed.
+     */
+<span class="fc" id="L157">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;failBuildOnAnyVulnerability&quot;, defaultValue = &quot;false&quot;, required = true)
+    private boolean failBuildOnAnyVulnerability = false;
+    /**
+     * Sets whether auto-updating of the NVD CVE/CPE data is enabled. It is not
+     * recommended that this be turned to false. Default is true.
+     */
+    @Parameter(property = &quot;autoUpdate&quot;)
+    private Boolean autoUpdate;
+    /**
+     * Sets whether Experimental analyzers are enabled. Default is false.
+     */
+    @Parameter(property = &quot;enableExperimental&quot;)
+    private Boolean enableExperimental;
+    /**
+     * Generate aggregate reports in multi-module projects.
+     *
+     * @deprecated use the aggregate goal instead
+     */
+    @Parameter(property = &quot;aggregate&quot;)
+    @Deprecated
+    private Boolean aggregate;
+    /**
+     * The report format to be generated (HTML, XML, VULN, ALL). This
+     * configuration option has no affect if using this within the Site plug-in
+     * unless the externalReport is set to true. Default is HTML.
+     */
+<span class="fc" id="L184">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;format&quot;, defaultValue = &quot;HTML&quot;, required = true)
+    private String format = &quot;HTML&quot;;
+    /**
+     * The Maven settings.
+     */
+    @Parameter(property = &quot;mavenSettings&quot;, defaultValue = &quot;${settings}&quot;, required = false)
+    private org.apache.maven.settings.Settings mavenSettings;
+
+    /**
+     * The maven settings proxy id.
+     */
+    @Parameter(property = &quot;mavenSettingsProxyId&quot;, required = false)
+    private String mavenSettingsProxyId;
+
+    /**
+     * The Connection Timeout.
+     */
+    @Parameter(property = &quot;connectionTimeout&quot;, defaultValue = &quot;&quot;, required = false)
+    private String connectionTimeout;
+    /**
+     * The paths to the suppression files.
+     */
+    @Parameter(property = &quot;suppressionFiles&quot;, required = false)
+    private String[] suppressionFiles;
+    /**
+     * The paths to the suppression file.
+     */
+    @Parameter(property = &quot;suppressionFile&quot;, required = false)
+    private String suppressionFile;
+    /**
+     * The path to the hints file.
+     */
+    @Parameter(property = &quot;hintsFile&quot;, defaultValue = &quot;&quot;, required = false)
+    private String hintsFile;
+
+    /**
+     * Flag indicating whether or not to show a summary in the output.
+     */
+<span class="fc" id="L223">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;showSummary&quot;, defaultValue = &quot;true&quot;, required = false)
+    private boolean showSummary = true;
+
+    /**
+     * Whether or not the Jar Analyzer is enabled.
+     */
+    @Parameter(property = &quot;jarAnalyzerEnabled&quot;, required = false)
+    private Boolean jarAnalyzerEnabled;
+
+    /**
+     * Whether or not the Archive Analyzer is enabled.
+     */
+    @Parameter(property = &quot;archiveAnalyzerEnabled&quot;, required = false)
+    private Boolean archiveAnalyzerEnabled;
+
+    /**
+     * Sets whether the Python Distribution Analyzer will be used.
+     */
+    @Parameter(property = &quot;pyDistributionAnalyzerEnabled&quot;, required = false)
+    private Boolean pyDistributionAnalyzerEnabled;
+    /**
+     * Sets whether the Python Package Analyzer will be used.
+     */
+    @Parameter(property = &quot;pyPackageAnalyzerEnabled&quot;, required = false)
+    private Boolean pyPackageAnalyzerEnabled;
+    /**
+     * Sets whether the Ruby Gemspec Analyzer will be used.
+     */
+    @Parameter(property = &quot;rubygemsAnalyzerEnabled&quot;, required = false)
+    private Boolean rubygemsAnalyzerEnabled;
+    /**
+     * Sets whether or not the openssl Analyzer should be used.
+     */
+    @Parameter(property = &quot;opensslAnalyzerEnabled&quot;, required = false)
+    private Boolean opensslAnalyzerEnabled;
+    /**
+     * Sets whether or not the CMake Analyzer should be used.
+     */
+    @Parameter(property = &quot;cmakeAnalyzerEnabled&quot;, required = false)
+    private Boolean cmakeAnalyzerEnabled;
+    /**
+     * Sets whether or not the autoconf Analyzer should be used.
+     */
+    @Parameter(property = &quot;autoconfAnalyzerEnabled&quot;, required = false)
+    private Boolean autoconfAnalyzerEnabled;
+    /**
+     * Sets whether or not the PHP Composer Lock File Analyzer should be used.
+     */
+    @Parameter(property = &quot;composerAnalyzerEnabled&quot;, required = false)
+    private Boolean composerAnalyzerEnabled;
+    /**
+     * Sets whether or not the Node.js Analyzer should be used.
+     */
+    @Parameter(property = &quot;nodeAnalyzerEnabled&quot;, required = false)
+    private Boolean nodeAnalyzerEnabled;
+    /**
+     * Sets whether or not the Node Security Project Analyzer should be used.
+     */
+    @Parameter(property = &quot;nspAnalyzerEnabled&quot;, required = false)
+    private Boolean nspAnalyzerEnabled;
+
+    /**
+     * Whether or not the .NET Assembly Analyzer is enabled.
+     */
+    @Parameter(property = &quot;assemblyAnalyzerEnabled&quot;, required = false)
+    private Boolean assemblyAnalyzerEnabled;
+
+    /**
+     * Whether or not the .NET Nuspec Analyzer is enabled.
+     */
+    @Parameter(property = &quot;nuspecAnalyzerEnabled&quot;, required = false)
+    private Boolean nuspecAnalyzerEnabled;
+
+    /**
+     * Whether or not the Central Analyzer is enabled.
+     */
+    @Parameter(property = &quot;centralAnalyzerEnabled&quot;, required = false)
+    private Boolean centralAnalyzerEnabled;
+
+    /**
+     * Whether or not the Nexus Analyzer is enabled.
+     */
+    @Parameter(property = &quot;nexusAnalyzerEnabled&quot;, required = false)
+    private Boolean nexusAnalyzerEnabled;
+
+    /**
+     * Whether or not the Ruby Bundle Audit Analyzer is enabled.
+     */
+    @Parameter(property = &quot;bundleAuditAnalyzerEnabled&quot;, required = false)
+    private Boolean bundleAuditAnalyzerEnabled;
+
+    /**
+     * Sets the path for the bundle-audit binary.
+     */
+    @Parameter(property = &quot;bundleAuditPath&quot;, defaultValue = &quot;&quot;, required = false)
+    private String bundleAuditPath;
+
+    /**
+     * Whether or not the CocoaPods Analyzer is enabled.
+     */
+    @Parameter(property = &quot;cocoapodsAnalyzerEnabled&quot;, required = false)
+    private Boolean cocoapodsAnalyzerEnabled;
+
+    /**
+     * Whether or not the Swift package Analyzer is enabled.
+     */
+    @Parameter(property = &quot;swiftPackageManagerAnalyzerEnabled&quot;, required = false)
+    private Boolean swiftPackageManagerAnalyzerEnabled;
+
+    /**
+     * The URL of a Nexus server's REST API end point
+     * (http://domain/nexus/service/local).
+     */
+    @Parameter(property = &quot;nexusUrl&quot;, required = false)
+    private String nexusUrl;
+    /**
+     * Whether or not the configured proxy is used to connect to Nexus.
+     */
+    @Parameter(property = &quot;nexusUsesProxy&quot;, required = false)
+    private Boolean nexusUsesProxy;
+    /**
+     * The database connection string.
+     */
+    @Parameter(property = &quot;connectionString&quot;, defaultValue = &quot;&quot;, required = false)
+    private String connectionString;
+
+    /**
+     * The database driver name. An example would be org.h2.Driver.
+     */
+    @Parameter(property = &quot;databaseDriverName&quot;, defaultValue = &quot;&quot;, required = false)
+    private String databaseDriverName;
+    /**
+     * The path to the database driver if it is not on the class path.
+     */
+    @Parameter(property = &quot;databaseDriverPath&quot;, defaultValue = &quot;&quot;, required = false)
+    private String databaseDriverPath;
+    /**
+     * The server id in the settings.xml; used to retrieve encrypted passwords
+     * from the settings.xml.
+     */
+    @Parameter(property = &quot;serverId&quot;, defaultValue = &quot;&quot;, required = false)
+    private String serverId;
+    /**
+     * A reference to the settings.xml settings.
+     */
+    @Parameter(defaultValue = &quot;${settings}&quot;, readonly = true, required = true)
+    private org.apache.maven.settings.Settings settingsXml;
+    /**
+     * The security dispatcher that can decrypt passwords in the settings.xml.
+     */
+    @Component(role = SecDispatcher.class, hint = &quot;default&quot;)
+    private SecDispatcher securityDispatcher;
+    /**
+     * The database user name.
+     */
+    @Parameter(property = &quot;databaseUser&quot;, defaultValue = &quot;&quot;, required = false)
+    private String databaseUser;
+    /**
+     * The password to use when connecting to the database.
+     */
+    @Parameter(property = &quot;databasePassword&quot;, defaultValue = &quot;&quot;, required = false)
+    private String databasePassword;
+    /**
+     * A comma-separated list of file extensions to add to analysis next to jar,
+     * zip, ....
+     */
+    @Parameter(property = &quot;zipExtensions&quot;, required = false)
+    private String zipExtensions;
+    /**
+     * Skip Dependency Check altogether.
+     */
+<span class="fc" id="L395">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;dependency-check.skip&quot;, defaultValue = &quot;false&quot;, required = false)
+    private boolean skip = false;
+    /**
+     * Skip Analysis for Test Scope Dependencies.
+     */
+<span class="fc" id="L401">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;skipTestScope&quot;, defaultValue = &quot;true&quot;, required = false)
+    private boolean skipTestScope = true;
+    /**
+     * Skip Analysis for Runtime Scope Dependencies.
+     */
+<span class="fc" id="L407">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;skipRuntimeScope&quot;, defaultValue = &quot;false&quot;, required = false)
+    private boolean skipRuntimeScope = false;
+    /**
+     * Skip Analysis for Provided Scope Dependencies.
+     */
+<span class="fc" id="L413">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;skipProvidedScope&quot;, defaultValue = &quot;false&quot;, required = false)
+    private boolean skipProvidedScope = false;
+
+    /**
+     * Skip Analysis for Provided Scope Dependencies.
+     */
+<span class="fc" id="L420">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;skipSystemScope&quot;, defaultValue = &quot;false&quot;, required = false)
+    private boolean skipSystemScope = false;
+
+    /**
+     * Skip analysis for dependencies which type matches this regular
+     * expression.
+     */
+    @SuppressWarnings(&quot;CanBeFinal&quot;)
+    @Parameter(property = &quot;skipArtifactType&quot;, required = false)
+    private String skipArtifactType;
+
+    /**
+     * The data directory, hold DC SQL DB.
+     */
+    @Parameter(property = &quot;dataDirectory&quot;, defaultValue = &quot;&quot;, required = false)
+    private String dataDirectory;
+    /**
+     * Data Mirror URL for CVE 1.2.
+     */
+    @Parameter(property = &quot;cveUrl12Modified&quot;, defaultValue = &quot;&quot;, required = false)
+    private String cveUrl12Modified;
+    /**
+     * Data Mirror URL for CVE 2.0.
+     */
+    @Parameter(property = &quot;cveUrl20Modified&quot;, defaultValue = &quot;&quot;, required = false)
+    private String cveUrl20Modified;
+    /**
+     * Base Data Mirror URL for CVE 1.2.
+     */
+    @Parameter(property = &quot;cveUrl12Base&quot;, defaultValue = &quot;&quot;, required = false)
+    private String cveUrl12Base;
+    /**
+     * Data Mirror URL for CVE 2.0.
+     */
+    @Parameter(property = &quot;cveUrl20Base&quot;, defaultValue = &quot;&quot;, required = false)
+    private String cveUrl20Base;
+    /**
+     * Optionally skip excessive CVE update checks for a designated duration in
+     * hours.
+     */
+    @Parameter(property = &quot;cveValidForHours&quot;, defaultValue = &quot;&quot;, required = false)
+    private Integer cveValidForHours;
+
+    /**
+     * The path to mono for .NET Assembly analysis on non-windows systems.
+     */
+    @Parameter(property = &quot;pathToMono&quot;, defaultValue = &quot;&quot;, required = false)
+    private String pathToMono;
+
+    /**
+     * The Proxy URL.
+     *
+     * @deprecated Please use mavenSettings instead
+     */
+<span class="fc" id="L475">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;proxyUrl&quot;, defaultValue = &quot;&quot;, required = false)
+    @Deprecated
+    private String proxyUrl = null;
+    /**
+     * Sets whether or not the external report format should be used.
+     *
+     * @deprecated the internal report is no longer supported
+     */
+<span class="fc" id="L484">    @SuppressWarnings(&quot;CanBeFinal&quot;)</span>
+    @Parameter(property = &quot;externalReport&quot;)
+    @Deprecated
+    private String externalReport = null;
+
+    /**
+     * The artifact scope filter.
+     */
+    private Filter&lt;String&gt; artifactScopeExcluded;
+
+    /**
+     * Filter for artifact type.
+     */
+    private Filter&lt;String&gt; artifactTypeExcluded;
+
+    /**
+     * An array of &lt;code&gt;fileSet&lt;/code&gt;s that specify additional files and/or directories
+     * (from the basedir) to analyze as part of the scan. If not specified, defaults to
+     * Maven conventions of:
+     * src/main/resources, src/main/filters, and src/main/webapp
+     */
+    @Parameter(property = &quot;scanSet&quot;, required = false)
+    private FileSet[] scanSet;
+
+
+    // &lt;/editor-fold&gt;
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Base Maven implementation&quot;&gt;
+    /**
+     * Executes dependency-check.
+     *
+     * @throws MojoExecutionException thrown if there is an exception executing
+     * the mojo
+     * @throws MojoFailureException thrown if dependency-check failed the build
+     */
+    @Override
+    public void execute() throws MojoExecutionException, MojoFailureException {
+<span class="nc" id="L520">        generatingSite = false;</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        if (skip) {</span>
+<span class="nc" id="L522">            getLog().info(&quot;Skipping &quot; + getName(Locale.US));</span>
+        } else {
+<span class="nc" id="L524">            validateAggregate();</span>
+<span class="nc" id="L525">            project.setContextValue(getOutputDirectoryContextKey(), this.outputDirectory);</span>
+<span class="nc" id="L526">            runCheck();</span>
+        }
+<span class="nc" id="L528">    }</span>
+
+    /**
+     * Checks if the aggregate configuration parameter has been set to true. If
+     * it has a MojoExecutionException is thrown because the aggregate
+     * configuration parameter is no longer supported.
+     *
+     * @throws MojoExecutionException thrown if aggregate is set to true
+     */
+    private void validateAggregate() throws MojoExecutionException {
+<span class="nc bnc" id="L538" title="All 4 branches missed.">        if (aggregate != null &amp;&amp; aggregate) {</span>
+<span class="nc" id="L539">            final String msg = &quot;Aggregate configuration detected - as of dependency-check 1.2.8 this no longer supported. &quot;</span>
+                    + &quot;Please use the aggregate goal instead.&quot;;
+<span class="nc" id="L541">            throw new MojoExecutionException(msg);</span>
+        }
+<span class="nc" id="L543">    }</span>
+
+    /**
+     * Generates the Dependency-Check Site Report.
+     *
+     * @param sink the sink to write the report to
+     * @param locale the locale to use when generating the report
+     * @throws MavenReportException if a maven report exception occurs
+     * @deprecated use
+     * {@link #generate(org.apache.maven.doxia.sink.Sink, java.util.Locale)}
+     * instead.
+     */
+    @Override
+    @Deprecated
+    public final void generate(@SuppressWarnings(&quot;deprecation&quot;) org.codehaus.doxia.sink.Sink sink, Locale locale) throws MavenReportException {
+<span class="nc" id="L558">        generate((Sink) sink, locale);</span>
+<span class="nc" id="L559">    }</span>
+
+    /**
+     * Returns true if the Maven site is being generated.
+     *
+     * @return true if the Maven site is being generated
+     */
+    protected boolean isGeneratingSite() {
+<span class="nc" id="L567">        return generatingSite;</span>
+    }
+
+    /**
+     * Returns the connection string.
+     *
+     * @return the connection string
+     */
+    protected String getConnectionString() {
+<span class="nc" id="L576">        return connectionString;</span>
+    }
+
+    /**
+     * Returns if the mojo should fail the build if an exception occurs.
+     *
+     * @return whether or not the mojo should fail the build
+     */
+    protected boolean isFailOnError() {
+<span class="nc" id="L585">        return failOnError;</span>
+    }
+
+    /**
+     * Generates the Dependency-Check Site Report.
+     *
+     * @param sink the sink to write the report to
+     * @param locale the locale to use when generating the report
+     * @throws MavenReportException if a maven report exception occurs
+     */
+    public void generate(Sink sink, Locale locale) throws MavenReportException {
+<span class="nc" id="L596">        generatingSite = true;</span>
+        try {
+<span class="nc" id="L598">            validateAggregate();</span>
+<span class="nc" id="L599">        } catch (MojoExecutionException ex) {</span>
+<span class="nc" id="L600">            throw new MavenReportException(ex.getMessage());</span>
+<span class="nc" id="L601">        }</span>
+<span class="nc" id="L602">        project.setContextValue(getOutputDirectoryContextKey(), getReportOutputDirectory());</span>
+        try {
+<span class="nc" id="L604">            runCheck();</span>
+<span class="nc" id="L605">        } catch (MojoExecutionException ex) {</span>
+<span class="nc" id="L606">            throw new MavenReportException(ex.getMessage(), ex);</span>
+<span class="nc" id="L607">        } catch (MojoFailureException ex) {</span>
+<span class="nc" id="L608">            getLog().warn(&quot;Vulnerabilities were identifies that exceed the CVSS threshold for failing the build&quot;);</span>
+<span class="nc" id="L609">        }</span>
+<span class="nc" id="L610">    }</span>
+
+    /**
+     * Returns the correct output directory depending on if a site is being
+     * executed or not.
+     *
+     * @return the directory to write the report(s)
+     * @throws MojoExecutionException thrown if there is an error loading the
+     * file path
+     */
+    protected File getCorrectOutputDirectory() throws MojoExecutionException {
+<span class="nc" id="L621">        return getCorrectOutputDirectory(this.project);</span>
+    }
+
+    /**
+     * Returns the correct output directory depending on if a site is being
+     * executed or not.
+     *
+     * @param current the Maven project to get the output directory from
+     * @return the directory to write the report(s)
+     */
+    protected File getCorrectOutputDirectory(MavenProject current) {
+<span class="nc" id="L632">        final Object obj = current.getContextValue(getOutputDirectoryContextKey());</span>
+<span class="nc bnc" id="L633" title="All 4 branches missed.">        if (obj != null &amp;&amp; obj instanceof File) {</span>
+<span class="nc" id="L634">            return (File) obj;</span>
+        }
+<span class="nc" id="L636">        File target = new File(current.getBuild().getDirectory());</span>
+<span class="nc bnc" id="L637" title="All 4 branches missed.">        if (target.getParentFile() != null &amp;&amp; &quot;target&quot;.equals(target.getParentFile().getName())) {</span>
+<span class="nc" id="L638">            target = target.getParentFile();</span>
+        }
+<span class="nc" id="L640">        return target;</span>
+    }
+
+    /**
+     * Scans the project's artifacts and adds them to the engine's dependency
+     * list.
+     *
+     * @param project the project to scan the dependencies of
+     * @param engine the engine to use to scan the dependencies
+     * @return a collection of exceptions that may have occurred while resolving
+     * and scanning the dependencies
+     */
+    protected ExceptionCollection scanArtifacts(MavenProject project, Engine engine) {
+        try {
+<span class="nc" id="L654">            final DependencyNode dn = dependencyGraphBuilder.buildDependencyGraph(project, null, reactorProjects);</span>
+<span class="nc" id="L655">            final ProjectBuildingRequest buildingRequest = newResolveArtifactProjectBuildingRequest();</span>
+<span class="nc" id="L656">            return collectDependencies(engine, project, dn.getChildren(), buildingRequest);</span>
+<span class="nc" id="L657">        } catch (DependencyGraphBuilderException ex) {</span>
+<span class="nc" id="L658">            final String msg = String.format(&quot;Unable to build dependency graph on project %s&quot;, project.getName());</span>
+<span class="nc" id="L659">            getLog().debug(msg, ex);</span>
+<span class="nc" id="L660">            return new ExceptionCollection(msg, ex);</span>
+        }
+    }
+
+    /**
+     * Resolves the projects artifacts using Aether and scans the resulting
+     * dependencies.
+     *
+     * @param engine the core dependency-check engine
+     * @param project the project being scanned
+     * @param nodes the list of dependency nodes, generally obtained via the
+     * DependencyGraphBuilder
+     * @param buildingRequest the Maven project building request
+     * @return a collection of exceptions that may have occurred while resolving
+     * and scanning the dependencies
+     */
+    private ExceptionCollection collectDependencies(Engine engine, MavenProject project,
+            List&lt;DependencyNode&gt; nodes, ProjectBuildingRequest buildingRequest) {
+<span class="nc" id="L678">        ExceptionCollection exCol = null;</span>
+<span class="nc bnc" id="L679" title="All 2 branches missed.">        for (DependencyNode dependencyNode : nodes) {</span>
+<span class="nc bnc" id="L680" title="All 4 branches missed.">            if (artifactScopeExcluded.passes(dependencyNode.getArtifact().getScope())</span>
+                    || artifactTypeExcluded.passes(dependencyNode.getArtifact().getType())) {
+<span class="nc" id="L682">                continue;</span>
+            }
+<span class="nc" id="L684">            exCol = collectDependencies(engine, project, dependencyNode.getChildren(), buildingRequest);</span>
+            try {
+<span class="nc" id="L686">                boolean isResolved = false;</span>
+<span class="nc" id="L687">                File artifactFile = null;</span>
+<span class="nc" id="L688">                String artifactId = null;</span>
+<span class="nc" id="L689">                String groupId = null;</span>
+<span class="nc" id="L690">                String version = null;</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">                if (org.apache.maven.artifact.Artifact.SCOPE_SYSTEM.equals(dependencyNode.getArtifact().getScope())) {</span>
+<span class="nc bnc" id="L692" title="All 2 branches missed.">                    for (org.apache.maven.model.Dependency d : project.getDependencies()) {</span>
+<span class="nc" id="L693">                        final Artifact a = dependencyNode.getArtifact();</span>
+<span class="nc bnc" id="L694" title="All 4 branches missed.">                        if (d.getSystemPath() != null &amp;&amp; artifactsMatch(d, a)) {</span>
+
+<span class="nc" id="L696">                            artifactFile = new File(d.getSystemPath());</span>
+<span class="nc" id="L697">                            isResolved = artifactFile.isFile();</span>
+<span class="nc" id="L698">                            groupId = a.getGroupId();</span>
+<span class="nc" id="L699">                            artifactId = a.getArtifactId();</span>
+<span class="nc" id="L700">                            version = a.getVersion();</span>
+<span class="nc" id="L701">                            break;</span>
+                        }
+<span class="nc" id="L703">                    }</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">                    if (!isResolved) {</span>
+<span class="nc" id="L705">                        getLog().error(&quot;Unable to resolve system scoped dependency: &quot; + dependencyNode.toNodeString());</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">                        if (exCol == null) {</span>
+<span class="nc" id="L707">                            exCol = new ExceptionCollection();</span>
+                        }
+<span class="nc" id="L709">                        exCol.addException(new DependencyNotFoundException(&quot;Unable to resolve system scoped dependency: &quot;</span>
+                                + dependencyNode.toNodeString()));
+                    }
+                } else {
+<span class="nc" id="L713">                    final ArtifactCoordinate coordinate = TransferUtils.toArtifactCoordinate(dependencyNode.getArtifact());</span>
+<span class="nc" id="L714">                    final Artifact result = artifactResolver.resolveArtifact(buildingRequest, coordinate).getArtifact();</span>
+<span class="nc" id="L715">                    isResolved = result.isResolved();</span>
+<span class="nc" id="L716">                    artifactFile = result.getFile();</span>
+<span class="nc" id="L717">                    groupId = result.getGroupId();</span>
+<span class="nc" id="L718">                    artifactId = result.getArtifactId();</span>
+<span class="nc" id="L719">                    version = result.getVersion();</span>
+                }
+<span class="nc bnc" id="L721" title="All 4 branches missed.">                if (isResolved &amp;&amp; artifactFile != null) {</span>
+<span class="nc" id="L722">                    final List&lt;Dependency&gt; deps = engine.scan(artifactFile.getAbsoluteFile(),</span>
+                            project.getName() + &quot;:&quot; + dependencyNode.getArtifact().getScope());
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                    if (deps != null) {</span>
+<span class="nc bnc" id="L725" title="All 2 branches missed.">                        if (deps.size() == 1) {</span>
+<span class="nc" id="L726">                            final Dependency d = deps.get(0);</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">                            if (d != null) {</span>
+<span class="nc" id="L728">                                final MavenArtifact ma = new MavenArtifact(groupId, artifactId, version);</span>
+<span class="nc" id="L729">                                d.addAsEvidence(&quot;pom&quot;, ma, Confidence.HIGHEST);</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">                                if (getLog().isDebugEnabled()) {</span>
+<span class="nc" id="L731">                                    getLog().debug(String.format(&quot;Adding project reference %s on dependency %s&quot;,</span>
+                                            project.getName(), d.getDisplayFileName()));
+                                }
+                            }
+<span class="nc bnc" id="L735" title="All 2 branches missed.">                        } else if (getLog().isDebugEnabled()) {</span>
+<span class="nc" id="L736">                            final String msg = String.format(&quot;More than 1 dependency was identified in first pass scan of '%s' in project %s&quot;,</span>
+                                    dependencyNode.getArtifact().getId(), project.getName());
+<span class="nc" id="L738">                            getLog().debug(msg);</span>
+<span class="nc" id="L739">                        }</span>
+                    } else {
+<span class="nc" id="L741">                        final String msg = String.format(&quot;Error resolving '%s' in project %s&quot;,</span>
+                                dependencyNode.getArtifact().getId(), project.getName());
+<span class="nc bnc" id="L743" title="All 2 branches missed.">                        if (exCol == null) {</span>
+<span class="nc" id="L744">                            exCol = new ExceptionCollection();</span>
+                        }
+<span class="nc" id="L746">                        getLog().error(msg);</span>
+                    }
+<span class="nc" id="L748">                } else {</span>
+<span class="nc" id="L749">                    final String msg = String.format(&quot;Unable to resolve '%s' in project %s&quot;,</span>
+                            dependencyNode.getArtifact().getId(), project.getName());
+<span class="nc" id="L751">                    getLog().debug(msg);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">                    if (exCol == null) {</span>
+<span class="nc" id="L753">                        exCol = new ExceptionCollection();</span>
+                    }
+                }
+<span class="nc" id="L756">            } catch (ArtifactResolverException ex) {</span>
+<span class="nc bnc" id="L757" title="All 2 branches missed.">                if (exCol == null) {</span>
+<span class="nc" id="L758">                    exCol = new ExceptionCollection();</span>
+                }
+<span class="nc" id="L760">                exCol.addException(ex);</span>
+<span class="nc" id="L761">            }</span>
+<span class="nc" id="L762">        }</span>
+
+        // Define the default FileSets
+<span class="nc bnc" id="L765" title="All 4 branches missed.">        if (scanSet == null || scanSet.length == 0) {</span>
+<span class="nc" id="L766">            final FileSet resourcesSet = new FileSet();</span>
+<span class="nc" id="L767">            final FileSet filtersSet = new FileSet();</span>
+<span class="nc" id="L768">            final FileSet webappSet = new FileSet();</span>
+            try {
+<span class="nc" id="L770">                resourcesSet.setDirectory(new File(project.getBasedir(), &quot;src/main/resources&quot;).getCanonicalPath());</span>
+<span class="nc" id="L771">                filtersSet.setDirectory(new File(project.getBasedir(), &quot;src/main/filters&quot;).getCanonicalPath());</span>
+<span class="nc" id="L772">                webappSet.setDirectory(new File(project.getBasedir(), &quot;src/main/webapp&quot;).getCanonicalPath());</span>
+<span class="nc" id="L773">            } catch (IOException ex) {</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">                if (exCol == null) {</span>
+<span class="nc" id="L775">                    exCol = new ExceptionCollection();</span>
+                }
+<span class="nc" id="L777">                exCol.addException(ex);</span>
+<span class="nc" id="L778">            }</span>
+<span class="nc" id="L779">            scanSet = new FileSet[] {resourcesSet, filtersSet, webappSet};</span>
+        }
+        // Iterate through FileSets and scan included files
+<span class="nc" id="L782">        final FileSetManager fileSetManager = new FileSetManager();</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">        for (FileSet fileSet: scanSet) {</span>
+<span class="nc" id="L784">            final String[] includedFiles = fileSetManager.getIncludedFiles(fileSet);</span>
+<span class="nc bnc" id="L785" title="All 2 branches missed.">            for (String include: includedFiles) {</span>
+<span class="nc" id="L786">                final File includeFile = new File(fileSet.getDirectory(), include).getAbsoluteFile();</span>
+<span class="nc bnc" id="L787" title="All 2 branches missed.">                if (includeFile.exists()) {</span>
+<span class="nc" id="L788">                    engine.scan(includeFile, project.getName());</span>
+                }
+                //TODO - should we add an exception/error reporting for files that do not exist?
+            }
+        }
+
+<span class="nc" id="L794">        return exCol;</span>
+    }
+
+    /**
+     * Determines if the groupId, artifactId, and version of the Maven
+     * dependency and artifact match.
+     *
+     * @param d the Maven dependency
+     * @param a the Maven artifact
+     * @return true if the groupId, artifactId, and version match
+     */
+    private static boolean artifactsMatch(org.apache.maven.model.Dependency d, Artifact a) {
+<span class="nc bnc" id="L806" title="All 6 branches missed.">        return (isEqualOrNull(a.getArtifactId(), d.getArtifactId()))</span>
+                &amp;&amp; (isEqualOrNull(a.getGroupId(), d.getGroupId()))
+                &amp;&amp; (isEqualOrNull(a.getVersion(), d.getVersion()));
+    }
+
+    /**
+     * Compares two strings for equality; if both strings are null they are
+     * considered equal.
+     *
+     * @param left the first string to compare
+     * @param right the second string to compare
+     * @return true if the strings are equal or if they are both null; otherwise
+     * false.
+     */
+    private static boolean isEqualOrNull(String left, String right) {
+<span class="nc bnc" id="L821" title="All 8 branches missed.">        return (left != null &amp;&amp; left.equals(right)) || (left == null &amp;&amp; right == null);</span>
+    }
+
+    /**
+     * @return Returns a new ProjectBuildingRequest populated from the current
+     * session and the current project remote repositories, used to resolve
+     * artifacts.
+     */
+    public ProjectBuildingRequest newResolveArtifactProjectBuildingRequest() {
+<span class="nc" id="L830">        final ProjectBuildingRequest buildingRequest = new DefaultProjectBuildingRequest(session.getProjectBuildingRequest());</span>
+<span class="nc" id="L831">        buildingRequest.setRemoteRepositories(remoteRepositories);</span>
+<span class="nc" id="L832">        return buildingRequest;</span>
+    }
+
+    /**
+     * Executes the dependency-check scan and generates the necessary report.
+     *
+     * @throws MojoExecutionException thrown if there is an exception running
+     * the scan
+     * @throws MojoFailureException thrown if dependency-check is configured to
+     * fail the build
+     */
+    public abstract void runCheck() throws MojoExecutionException, MojoFailureException;
+
+    /**
+     * Sets the Reporting output directory.
+     *
+     * @param directory the output directory
+     */
+    @Override
+    public void setReportOutputDirectory(File directory) {
+<span class="nc" id="L852">        reportOutputDirectory = directory;</span>
+<span class="nc" id="L853">    }</span>
+
+    /**
+     * Returns the report output directory.
+     *
+     * @return the report output directory
+     */
+    @Override
+    public File getReportOutputDirectory() {
+<span class="nc" id="L862">        return reportOutputDirectory;</span>
+    }
+
+    /**
+     * Returns the output directory.
+     *
+     * @return the output directory
+     */
+    public File getOutputDirectory() {
+<span class="nc" id="L871">        return outputDirectory;</span>
+    }
+
+    /**
+     * Returns whether this is an external report. This method always returns
+     * true.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt;
+     */
+    @Override
+    public final boolean isExternalReport() {
+<span class="nc" id="L882">        return true;</span>
+    }
+
+    /**
+     * Returns the output name.
+     *
+     * @return the output name
+     */
+    @Override
+    public String getOutputName() {
+<span class="nc bnc" id="L892" title="All 4 branches missed.">        if (&quot;HTML&quot;.equalsIgnoreCase(this.format) || &quot;ALL&quot;.equalsIgnoreCase(this.format)) {</span>
+<span class="nc" id="L893">            return &quot;dependency-check-report&quot;;</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">        } else if (&quot;XML&quot;.equalsIgnoreCase(this.format)) {</span>
+<span class="nc" id="L895">            return &quot;dependency-check-report.xml#&quot;;</span>
+<span class="nc bnc" id="L896" title="All 2 branches missed.">        } else if (&quot;VULN&quot;.equalsIgnoreCase(this.format)) {</span>
+<span class="nc" id="L897">            return &quot;dependency-check-vulnerability&quot;;</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        } else if (&quot;JSON&quot;.equalsIgnoreCase(this.format)) {</span>
+<span class="nc" id="L899">            return &quot;dependency-check-report.json&quot;;</span>
+<span class="nc bnc" id="L900" title="All 2 branches missed.">        } else if (&quot;CSV&quot;.equalsIgnoreCase(this.format)) {</span>
+<span class="nc" id="L901">            return &quot;dependency-check-report.csv&quot;;</span>
+        } else {
+<span class="nc" id="L903">            getLog().warn(&quot;Unknown report format used during site generation.&quot;);</span>
+<span class="nc" id="L904">            return &quot;dependency-check-report&quot;;</span>
+        }
+    }
+
+    /**
+     * Returns the category name.
+     *
+     * @return the category name
+     */
+    @Override
+    public String getCategoryName() {
+<span class="nc" id="L915">        return MavenReport.CATEGORY_PROJECT_REPORTS;</span>
+    }
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Initializes a new &lt;code&gt;Engine&lt;/code&gt; that can be used for scanning.
+     *
+     * @return a newly instantiated &lt;code&gt;Engine&lt;/code&gt;
+     * @throws DatabaseException thrown if there is a database exception
+     */
+    protected Engine initializeEngine() throws DatabaseException {
+<span class="nc" id="L926">        populateSettings();</span>
+<span class="nc" id="L927">        return new Engine();</span>
+    }
+
+    /**
+     * Takes the properties supplied and updates the dependency-check settings.
+     * Additionally, this sets the system properties required to change the
+     * proxy url, port, and connection timeout.
+     */
+    protected void populateSettings() {
+<span class="nc" id="L936">        Settings.initialize();</span>
+<span class="nc" id="L937">        InputStream mojoProperties = null;</span>
+        try {
+<span class="nc" id="L939">            mojoProperties = this.getClass().getClassLoader().getResourceAsStream(PROPERTIES_FILE);</span>
+<span class="nc" id="L940">            Settings.mergeProperties(mojoProperties);</span>
+<span class="nc" id="L941">        } catch (IOException ex) {</span>
+<span class="nc" id="L942">            getLog().warn(&quot;Unable to load the dependency-check ant task.properties file.&quot;);</span>
+<span class="nc bnc" id="L943" title="All 2 branches missed.">            if (getLog().isDebugEnabled()) {</span>
+<span class="nc" id="L944">                getLog().debug(&quot;&quot;, ex);</span>
+            }
+        } finally {
+<span class="nc bnc" id="L947" title="All 6 branches missed.">            if (mojoProperties != null) {</span>
+                try {
+<span class="nc" id="L949">                    mojoProperties.close();</span>
+<span class="nc" id="L950">                } catch (IOException ex) {</span>
+<span class="nc bnc" id="L951" title="All 6 branches missed.">                    if (getLog().isDebugEnabled()) {</span>
+<span class="nc" id="L952">                        getLog().debug(&quot;&quot;, ex);</span>
+                    }
+<span class="nc" id="L954">                }</span>
+            }
+        }
+<span class="nc" id="L957">        Settings.setBooleanIfNotNull(Settings.KEYS.AUTO_UPDATE, autoUpdate);</span>
+
+<span class="nc" id="L959">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_EXPERIMENTAL_ENABLED, enableExperimental);</span>
+
+<span class="nc bnc" id="L961" title="All 2 branches missed.">        if (externalReport != null) {</span>
+<span class="nc" id="L962">            getLog().warn(&quot;The 'externalReport' option was set; this configuration option has been removed. &quot;</span>
+                    + &quot;Please update the dependency-check-maven plugin's configuration&quot;);
+        }
+
+<span class="nc bnc" id="L966" title="All 4 branches missed.">        if (proxyUrl != null &amp;&amp; !proxyUrl.isEmpty()) {</span>
+<span class="nc" id="L967">            getLog().warn(&quot;Deprecated configuration detected, proxyUrl will be ignored; use the maven settings to configure the proxy instead&quot;);</span>
+        }
+<span class="nc" id="L969">        final Proxy proxy = getMavenProxy();</span>
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (proxy != null) {</span>
+<span class="nc" id="L971">            Settings.setString(Settings.KEYS.PROXY_SERVER, proxy.getHost());</span>
+<span class="nc" id="L972">            Settings.setString(Settings.KEYS.PROXY_PORT, Integer.toString(proxy.getPort()));</span>
+<span class="nc" id="L973">            final String userName = proxy.getUsername();</span>
+<span class="nc" id="L974">            final String password = proxy.getPassword();</span>
+<span class="nc" id="L975">            Settings.setStringIfNotNull(Settings.KEYS.PROXY_USERNAME, userName);</span>
+<span class="nc" id="L976">            Settings.setStringIfNotNull(Settings.KEYS.PROXY_PASSWORD, password);</span>
+<span class="nc" id="L977">            Settings.setStringIfNotNull(Settings.KEYS.PROXY_NON_PROXY_HOSTS, proxy.getNonProxyHosts());</span>
+        }
+<span class="nc" id="L979">        final String[] suppressions = determineSuppressions();</span>
+<span class="nc" id="L980">        Settings.setArrayIfNotEmpty(Settings.KEYS.SUPPRESSION_FILE, suppressions);</span>
+
+<span class="nc" id="L982">        Settings.setStringIfNotEmpty(Settings.KEYS.CONNECTION_TIMEOUT, connectionTimeout);</span>
+<span class="nc" id="L983">        Settings.setStringIfNotEmpty(Settings.KEYS.HINTS_FILE, hintsFile);</span>
+
+        //File Type Analyzer Settings
+<span class="nc" id="L986">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_JAR_ENABLED, jarAnalyzerEnabled);</span>
+<span class="nc" id="L987">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NUSPEC_ENABLED, nuspecAnalyzerEnabled);</span>
+<span class="nc" id="L988">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_CENTRAL_ENABLED, centralAnalyzerEnabled);</span>
+<span class="nc" id="L989">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NEXUS_ENABLED, nexusAnalyzerEnabled);</span>
+<span class="nc" id="L990">        Settings.setStringIfNotEmpty(Settings.KEYS.ANALYZER_NEXUS_URL, nexusUrl);</span>
+<span class="nc" id="L991">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NEXUS_USES_PROXY, nexusUsesProxy);</span>
+<span class="nc" id="L992">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_ASSEMBLY_ENABLED, assemblyAnalyzerEnabled);</span>
+<span class="nc" id="L993">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_ARCHIVE_ENABLED, archiveAnalyzerEnabled);</span>
+<span class="nc" id="L994">        Settings.setStringIfNotEmpty(Settings.KEYS.ADDITIONAL_ZIP_EXTENSIONS, zipExtensions);</span>
+<span class="nc" id="L995">        Settings.setStringIfNotEmpty(Settings.KEYS.ANALYZER_ASSEMBLY_MONO_PATH, pathToMono);</span>
+
+<span class="nc" id="L997">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_PYTHON_DISTRIBUTION_ENABLED, pyDistributionAnalyzerEnabled);</span>
+<span class="nc" id="L998">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_PYTHON_PACKAGE_ENABLED, pyPackageAnalyzerEnabled);</span>
+<span class="nc" id="L999">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_RUBY_GEMSPEC_ENABLED, rubygemsAnalyzerEnabled);</span>
+<span class="nc" id="L1000">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_OPENSSL_ENABLED, opensslAnalyzerEnabled);</span>
+<span class="nc" id="L1001">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_CMAKE_ENABLED, cmakeAnalyzerEnabled);</span>
+<span class="nc" id="L1002">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_AUTOCONF_ENABLED, autoconfAnalyzerEnabled);</span>
+<span class="nc" id="L1003">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_COMPOSER_LOCK_ENABLED, composerAnalyzerEnabled);</span>
+<span class="nc" id="L1004">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NODE_PACKAGE_ENABLED, nodeAnalyzerEnabled);</span>
+<span class="nc" id="L1005">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_NSP_PACKAGE_ENABLED, nspAnalyzerEnabled);</span>
+<span class="nc" id="L1006">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_BUNDLE_AUDIT_ENABLED, bundleAuditAnalyzerEnabled);</span>
+<span class="nc" id="L1007">        Settings.setStringIfNotNull(Settings.KEYS.ANALYZER_BUNDLE_AUDIT_PATH, bundleAuditPath);</span>
+<span class="nc" id="L1008">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_COCOAPODS_ENABLED, cocoapodsAnalyzerEnabled);</span>
+<span class="nc" id="L1009">        Settings.setBooleanIfNotNull(Settings.KEYS.ANALYZER_SWIFT_PACKAGE_MANAGER_ENABLED, swiftPackageManagerAnalyzerEnabled);</span>
+
+        //Database configuration
+<span class="nc" id="L1012">        Settings.setStringIfNotEmpty(Settings.KEYS.DB_DRIVER_NAME, databaseDriverName);</span>
+<span class="nc" id="L1013">        Settings.setStringIfNotEmpty(Settings.KEYS.DB_DRIVER_PATH, databaseDriverPath);</span>
+<span class="nc" id="L1014">        Settings.setStringIfNotEmpty(Settings.KEYS.DB_CONNECTION_STRING, connectionString);</span>
+
+<span class="nc bnc" id="L1016" title="All 6 branches missed.">        if (databaseUser == null &amp;&amp; databasePassword == null &amp;&amp; serverId != null) {</span>
+<span class="nc" id="L1017">            final Server server = settingsXml.getServer(serverId);</span>
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">            if (server != null) {</span>
+<span class="nc" id="L1019">                databaseUser = server.getUsername();</span>
+                try {
+                    //The following fix was copied from:
+                    //   https://github.com/bsorrentino/maven-confluence-plugin/blob/master/maven-confluence-reporting-plugin/src/main/java/org/bsc/maven/confluence/plugin/AbstractBaseConfluenceMojo.java
+                    //
+                    // FIX to resolve
+                    // org.sonatype.plexus.components.sec.dispatcher.SecDispatcherException:
+                    // java.io.FileNotFoundException: ~/.settings-security.xml (No such file or directory)
+                    //
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">                    if (securityDispatcher instanceof DefaultSecDispatcher) {</span>
+<span class="nc" id="L1029">                        ((DefaultSecDispatcher) securityDispatcher).setConfigurationFile(&quot;~/.m2/settings-security.xml&quot;);</span>
+                    }
+
+<span class="nc" id="L1032">                    databasePassword = securityDispatcher.decrypt(server.getPassword());</span>
+<span class="nc" id="L1033">                } catch (SecDispatcherException ex) {</span>
+<span class="nc bnc" id="L1034" title="All 6 branches missed.">                    if (ex.getCause() instanceof FileNotFoundException</span>
+                            || (ex.getCause() != null &amp;&amp; ex.getCause().getCause() instanceof FileNotFoundException)) {
+                        //maybe its not encrypted?
+<span class="nc" id="L1037">                        final String tmp = server.getPassword();</span>
+<span class="nc bnc" id="L1038" title="All 4 branches missed.">                        if (tmp.startsWith(&quot;{&quot;) &amp;&amp; tmp.endsWith(&quot;}&quot;)) {</span>
+<span class="nc" id="L1039">                            getLog().error(String.format(</span>
+                                    &quot;Unable to decrypt the server password for server id '%s' in settings.xml%n\tCause: %s&quot;,
+                                    serverId, ex.getMessage()));
+                        } else {
+<span class="nc" id="L1043">                            databasePassword = tmp;</span>
+                        }
+<span class="nc" id="L1045">                    } else {</span>
+<span class="nc" id="L1046">                        getLog().error(String.format(</span>
+                                &quot;Unable to decrypt the server password for server id '%s' in settings.xml%n\tCause: %s&quot;,
+                                serverId, ex.getMessage()));
+                    }
+<span class="nc" id="L1050">                }</span>
+            } else {
+<span class="nc" id="L1052">                getLog().error(String.format(&quot;Server '%s' not found in the settings.xml file&quot;, serverId));</span>
+            }
+        }
+
+<span class="nc" id="L1056">        Settings.setStringIfNotEmpty(Settings.KEYS.DB_USER, databaseUser);</span>
+<span class="nc" id="L1057">        Settings.setStringIfNotEmpty(Settings.KEYS.DB_PASSWORD, databasePassword);</span>
+<span class="nc" id="L1058">        Settings.setStringIfNotEmpty(Settings.KEYS.DATA_DIRECTORY, dataDirectory);</span>
+
+<span class="nc" id="L1060">        Settings.setStringIfNotEmpty(Settings.KEYS.CVE_MODIFIED_12_URL, cveUrl12Modified);</span>
+<span class="nc" id="L1061">        Settings.setStringIfNotEmpty(Settings.KEYS.CVE_MODIFIED_20_URL, cveUrl20Modified);</span>
+<span class="nc" id="L1062">        Settings.setStringIfNotEmpty(Settings.KEYS.CVE_SCHEMA_1_2, cveUrl12Base);</span>
+<span class="nc" id="L1063">        Settings.setStringIfNotEmpty(Settings.KEYS.CVE_SCHEMA_2_0, cveUrl20Base);</span>
+<span class="nc" id="L1064">        Settings.setIntIfNotNull(Settings.KEYS.CVE_CHECK_VALID_FOR_HOURS, cveValidForHours);</span>
+
+<span class="nc" id="L1066">        artifactScopeExcluded = new ArtifactScopeExcluded(skipTestScope, skipProvidedScope, skipSystemScope, skipRuntimeScope);</span>
+<span class="nc" id="L1067">        artifactTypeExcluded = new ArtifactTypeExcluded(skipArtifactType);</span>
+<span class="nc" id="L1068">    }</span>
+
+    /**
+     * Combines the configured suppressionFile and suppressionFiles into a
+     * single array.
+     *
+     * @return an array of suppression file paths
+     */
+    private String[] determineSuppressions() {
+<span class="nc" id="L1077">        String[] suppressions = suppressionFiles;</span>
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">        if (suppressionFile != null) {</span>
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">            if (suppressions == null) {</span>
+<span class="nc" id="L1080">                suppressions = new String[]{suppressionFile};</span>
+            } else {
+<span class="nc" id="L1082">                suppressions = Arrays.copyOf(suppressions, suppressions.length + 1);</span>
+<span class="nc" id="L1083">                suppressions[suppressions.length - 1] = suppressionFile;</span>
+            }
+        }
+<span class="nc" id="L1086">        return suppressions;</span>
+    }
+
+    /**
+     * Returns the maven proxy.
+     *
+     * @return the maven proxy
+     */
+    private Proxy getMavenProxy() {
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">        if (mavenSettings != null) {</span>
+<span class="nc" id="L1096">            final List&lt;Proxy&gt; proxies = mavenSettings.getProxies();</span>
+<span class="nc bnc" id="L1097" title="All 4 branches missed.">            if (proxies != null &amp;&amp; !proxies.isEmpty()) {</span>
+<span class="nc bnc" id="L1098" title="All 2 branches missed.">                if (mavenSettingsProxyId != null) {</span>
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">                    for (Proxy proxy : proxies) {</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">                        if (mavenSettingsProxyId.equalsIgnoreCase(proxy.getId())) {</span>
+<span class="nc" id="L1101">                            return proxy;</span>
+                        }
+<span class="nc" id="L1103">                    }</span>
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">                } else if (proxies.size() == 1) {</span>
+<span class="nc" id="L1105">                    return proxies.get(0);</span>
+                } else {
+<span class="nc" id="L1107">                    getLog().warn(&quot;Multiple proxy definitions exist in the Maven settings. In the dependency-check &quot;</span>
+                            + &quot;configuration set the mavenSettingsProxyId so that the correct proxy will be used.&quot;);
+<span class="nc" id="L1109">                    throw new IllegalStateException(&quot;Ambiguous proxy definition&quot;);</span>
+                }
+            }
+        }
+<span class="nc" id="L1113">        return null;</span>
+    }
+
+    /**
+     * Returns a reference to the current project. This method is used instead
+     * of auto-binding the project via component annotation in concrete
+     * implementations of this. If the child has a
+     * &lt;code&gt;@Component MavenProject project;&lt;/code&gt; defined then the abstract
+     * class (i.e. this class) will not have access to the current project (just
+     * the way Maven works with the binding).
+     *
+     * @return returns a reference to the current project
+     */
+    protected MavenProject getProject() {
+<span class="nc" id="L1127">        return project;</span>
+    }
+
+    /**
+     * Returns the list of Maven Projects in this build.
+     *
+     * @return the list of Maven Projects in this build
+     */
+    protected List&lt;MavenProject&gt; getReactorProjects() {
+<span class="nc" id="L1136">        return reactorProjects;</span>
+    }
+
+    /**
+     * Returns the report format.
+     *
+     * @return the report format
+     */
+    protected String getFormat() {
+<span class="nc" id="L1145">        return format;</span>
+    }
+
+    /**
+     * Returns the artifact scope excluded filter.
+     *
+     * @return the artifact scope excluded filter
+     */
+    protected Filter&lt;String&gt; getArtifactScopeExcluded() {
+<span class="nc" id="L1154">        return artifactScopeExcluded;</span>
+    }
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Methods to fail build or show summary&quot;&gt;
+    /**
+     * Checks to see if a vulnerability has been identified with a CVSS score
+     * that is above the threshold set in the configuration.
+     *
+     * @param dependencies the list of dependency objects
+     * @throws MojoFailureException thrown if a CVSS score is found that is
+     * higher then the threshold set
+     */
+    protected void checkForFailure(List&lt;Dependency&gt; dependencies) throws MojoFailureException {
+<span class="nc" id="L1167">        final StringBuilder ids = new StringBuilder();</span>
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">        for (Dependency d : dependencies) {</span>
+<span class="nc" id="L1169">            boolean addName = true;</span>
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">            for (Vulnerability v : d.getVulnerabilities()) {</span>
+<span class="nc bnc" id="L1171" title="All 4 branches missed.">                if (failBuildOnAnyVulnerability || v.getCvssScore() &gt;= failBuildOnCVSS) {</span>
+<span class="nc bnc" id="L1172" title="All 2 branches missed.">                    if (addName) {</span>
+<span class="nc" id="L1173">                        addName = false;</span>
+<span class="nc" id="L1174">                        ids.append(NEW_LINE).append(d.getFileName()).append(&quot;: &quot;);</span>
+<span class="nc" id="L1175">                        ids.append(v.getName());</span>
+                    } else {
+<span class="nc" id="L1177">                        ids.append(&quot;, &quot;).append(v.getName());</span>
+                    }
+                }
+<span class="nc" id="L1180">            }</span>
+<span class="nc" id="L1181">        }</span>
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">        if (ids.length() &gt; 0) {</span>
+            final String msg;
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">            if (failBuildOnAnyVulnerability) {</span>
+<span class="nc" id="L1185">                msg = String.format(&quot;%n%nOne or more dependencies were identified with vulnerabilities: %n%s%n%n&quot;</span>
+                        + &quot;See the dependency-check report for more details.%n%n&quot;, ids.toString());
+            } else {
+<span class="nc" id="L1188">                msg = String.format(&quot;%n%nOne or more dependencies were identified with vulnerabilities that have a CVSS score greater than '%.1f': &quot;</span>
+                        + &quot;%n%s%n%nSee the dependency-check report for more details.%n%n&quot;, failBuildOnCVSS, ids.toString());
+            }
+
+<span class="nc" id="L1192">            throw new MojoFailureException(msg);</span>
+        }
+<span class="nc" id="L1194">    }</span>
+
+    /**
+     * Generates a warning message listing a summary of dependencies and their
+     * associated CPE and CVE entries.
+     *
+     * @param mp the Maven project for which the summary is shown
+     * @param dependencies a list of dependency objects
+     */
+    protected void showSummary(MavenProject mp, List&lt;Dependency&gt; dependencies) {
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">        if (showSummary) {</span>
+<span class="nc" id="L1205">            final StringBuilder summary = new StringBuilder();</span>
+<span class="nc bnc" id="L1206" title="All 2 branches missed.">            for (Dependency d : dependencies) {</span>
+<span class="nc" id="L1207">                boolean firstEntry = true;</span>
+<span class="nc" id="L1208">                final StringBuilder ids = new StringBuilder();</span>
+<span class="nc bnc" id="L1209" title="All 2 branches missed.">                for (Vulnerability v : d.getVulnerabilities()) {</span>
+<span class="nc bnc" id="L1210" title="All 2 branches missed.">                    if (firstEntry) {</span>
+<span class="nc" id="L1211">                        firstEntry = false;</span>
+                    } else {
+<span class="nc" id="L1213">                        ids.append(&quot;, &quot;);</span>
+                    }
+<span class="nc" id="L1215">                    ids.append(v.getName());</span>
+<span class="nc" id="L1216">                }</span>
+<span class="nc bnc" id="L1217" title="All 2 branches missed.">                if (ids.length() &gt; 0) {</span>
+<span class="nc" id="L1218">                    summary.append(d.getFileName()).append(&quot; (&quot;);</span>
+<span class="nc" id="L1219">                    firstEntry = true;</span>
+<span class="nc bnc" id="L1220" title="All 2 branches missed.">                    for (Identifier id : d.getIdentifiers()) {</span>
+<span class="nc bnc" id="L1221" title="All 2 branches missed.">                        if (firstEntry) {</span>
+<span class="nc" id="L1222">                            firstEntry = false;</span>
+                        } else {
+<span class="nc" id="L1224">                            summary.append(&quot;, &quot;);</span>
+                        }
+<span class="nc" id="L1226">                        summary.append(id.getValue());</span>
+<span class="nc" id="L1227">                    }</span>
+<span class="nc" id="L1228">                    summary.append(&quot;) : &quot;).append(ids).append(NEW_LINE);</span>
+                }
+<span class="nc" id="L1230">            }</span>
+<span class="nc bnc" id="L1231" title="All 2 branches missed.">            if (summary.length() &gt; 0) {</span>
+<span class="nc" id="L1232">                final String msg = String.format(&quot;%n%n&quot; + &quot;One or more dependencies were identified with known vulnerabilities in %s:%n%n%s&quot;</span>
+                        + &quot;%n%nSee the dependency-check report for more details.%n%n&quot;, mp.getName(), summary.toString());
+<span class="nc" id="L1234">                getLog().warn(msg);</span>
+            }
+        }
+<span class="nc" id="L1237">    }</span>
+
+    //&lt;/editor-fold&gt;
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Methods to read/write the serialized data file&quot;&gt;
+    /**
+     * Returns the key used to store the path to the data file that is saved by
+     * &lt;code&gt;writeDataFile()&lt;/code&gt;. This key is used in the
+     * &lt;code&gt;MavenProject.(set|get)ContextValue&lt;/code&gt;.
+     *
+     * @return the key used to store the path to the data file
+     */
+    protected String getDataFileContextKey() {
+<span class="nc" id="L1249">        return &quot;dependency-check-path-&quot; + dataFileName;</span>
+    }
+
+    /**
+     * Returns the key used to store the path to the output directory. When
+     * generating the report in the &lt;code&gt;executeAggregateReport()&lt;/code&gt; the
+     * output directory should be obtained by using this key.
+     *
+     * @return the key used to store the path to the output directory
+     */
+    protected String getOutputDirectoryContextKey() {
+<span class="nc" id="L1260">        return &quot;dependency-output-dir-&quot; + dataFileName;</span>
+    }
+
+    //&lt;/editor-fold&gt;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

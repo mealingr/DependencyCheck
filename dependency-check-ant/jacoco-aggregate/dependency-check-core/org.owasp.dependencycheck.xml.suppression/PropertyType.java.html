@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PropertyType.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Ant Task</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.xml.suppression</a> &gt; <span class="el_source">PropertyType.java</span></div><h1>PropertyType.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.xml.suppression;
+
+import java.util.regex.Pattern;
+
+/**
+ * A simple PropertyType used to represent a string value that could be used as a regular expression or could be case
+ * insensitive. The equals method has been over-ridden so that the object will correctly compare to strings.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L28">public class PropertyType {</span>
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;properties&quot;&gt;
+    /**
+     * The value.
+     */
+    private String value;
+    /**
+     * Whether or not the expression is a regex.
+     */
+<span class="fc" id="L38">    private boolean regex = false;</span>
+    /**
+     * Indicates case sensitivity.
+     */
+<span class="fc" id="L42">    private boolean caseSensitive = false;</span>
+
+    /**
+     * Gets the value of the value property.
+     *
+     * @return the value of the value property
+     *
+     */
+    public String getValue() {
+<span class="fc" id="L51">        return value;</span>
+    }
+
+    /**
+     * Sets the value of the value property.
+     *
+     * @param value the value of the value property
+     */
+    public void setValue(String value) {
+<span class="fc" id="L60">        this.value = value;</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Returns whether or not the value is a regex.
+     *
+     * @return true if the value is a regex, otherwise false
+     *
+     */
+    public boolean isRegex() {
+<span class="fc" id="L70">        return regex;</span>
+    }
+
+    /**
+     * Sets whether the value property is a regex.
+     *
+     * @param value true if the value is a regex, otherwise false
+     *
+     */
+    public void setRegex(boolean value) {
+<span class="fc" id="L80">        this.regex = value;</span>
+<span class="fc" id="L81">    }</span>
+    /**
+     * Gets the value of the caseSensitive property.
+     *
+     * @return true if the value is case sensitive
+     *
+     */
+    public boolean isCaseSensitive() {
+<span class="fc" id="L89">        return caseSensitive;</span>
+    }
+
+    /**
+     * Sets the value of the caseSensitive property.
+     *
+     * @param value whether the value is case sensitive
+     *
+     */
+    public void setCaseSensitive(boolean value) {
+<span class="fc" id="L99">        this.caseSensitive = value;</span>
+<span class="fc" id="L100">    }</span>
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Uses the object's properties to determine if the supplied string matches the value of this property.
+     *
+     * @param text the String to validate
+     * @return whether the text supplied is matched by the value of the property
+     */
+    public boolean matches(String text) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (text == null) {</span>
+<span class="fc" id="L111">            return false;</span>
+        }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (this.regex) {</span>
+            Pattern rx;
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (this.caseSensitive) {</span>
+<span class="fc" id="L116">                rx = Pattern.compile(this.value);</span>
+            } else {
+<span class="fc" id="L118">                rx = Pattern.compile(this.value, Pattern.CASE_INSENSITIVE);</span>
+            }
+<span class="fc" id="L120">            return rx.matcher(text).matches();</span>
+        } else {
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (this.caseSensitive) {</span>
+<span class="fc" id="L123">                return value.equals(text);</span>
+            } else {
+<span class="fc" id="L125">                return value.equalsIgnoreCase(text);</span>
+            }
+        }
+    }
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;standard implementations of hashCode, equals, and toString&quot;&gt;
+    /**
+     * Default implementation of hashCode.
+     *
+     * @return the hash code
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L138">        int hash = 3;</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        hash = 59 * hash + (this.value != null ? this.value.hashCode() : 0);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        hash = 59 * hash + (this.regex ? 1 : 0);</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        hash = 59 * hash + (this.caseSensitive ? 1 : 0);</span>
+<span class="nc" id="L142">        return hash;</span>
+    }
+
+    /**
+     * Default implementation of equals.
+     *
+     * @param obj the object to compare
+     * @return whether the objects are equivalent
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L154">            return false;</span>
+        }
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L157">            return false;</span>
+        }
+<span class="fc" id="L159">        final PropertyType other = (PropertyType) obj;</span>
+<span class="pc bpc" id="L160" title="4 of 6 branches missed.">        if ((this.value == null) ? (other.value != null) : !this.value.equals(other.value)) {</span>
+<span class="nc" id="L161">            return false;</span>
+        }
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (this.regex != other.regex) {</span>
+<span class="nc" id="L164">            return false;</span>
+        }
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        return this.caseSensitive == other.caseSensitive;</span>
+    }
+
+    /**
+     * Default implementation of toString().
+     *
+     * @return the string representation of the object
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L176">        return &quot;PropertyType{&quot; + &quot;value=&quot; + value + &quot;, regex=&quot; + regex + &quot;, caseSensitive=&quot; + caseSensitive + '}';</span>
+    }
+    //&lt;/editor-fold&gt;
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Checksum.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-utils</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.utils</a> &gt; <span class="el_source">Checksum.java</span></div><h1>Checksum.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2014 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.utils;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
+/**
+ * Includes methods to generate the MD5 and SHA1 checksum.
+ *
+ * @author Jeremy Long
+ *
+ */
+public final class Checksum {
+
+    /**
+     * Hex code characters used in getHex.
+     */
+    private static final String HEXES = &quot;0123456789abcdef&quot;;
+
+    /**
+     * Private constructor for a utility class.
+     */
+<span class="nc" id="L44">    private Checksum() {</span>
+<span class="nc" id="L45">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Creates the cryptographic checksum of a given file using the specified
+     * algorithm.&lt;/p&gt;
+     *
+     * @param algorithm the algorithm to use to calculate the checksum
+     * @param file the file to calculate the checksum for
+     * @return the checksum
+     * @throws IOException when the file does not exist
+     * @throws NoSuchAlgorithmException when an algorithm is specified that does
+     * not exist
+     */
+    public static byte[] getChecksum(String algorithm, File file) throws NoSuchAlgorithmException, IOException {
+<span class="fc" id="L60">        final MessageDigest md = MessageDigest.getInstance(algorithm);</span>
+<span class="pc" id="L61">        try (FileInputStream fis = new FileInputStream(file);</span>
+<span class="fc" id="L62">                FileChannel ch = fis.getChannel()) {</span>
+<span class="fc" id="L63">            final ByteBuffer buf = ByteBuffer.allocateDirect(8192);</span>
+<span class="fc" id="L64">            int b = ch.read(buf);</span>
+<span class="pc bpc" id="L65" title="1 of 4 branches missed.">            while (b != -1 &amp;&amp; b != 0) {</span>
+<span class="fc" id="L66">                buf.flip();</span>
+<span class="fc" id="L67">                final byte[] bytes = new byte[b];</span>
+<span class="fc" id="L68">                buf.get(bytes);</span>
+<span class="fc" id="L69">                md.update(bytes, 0, b);</span>
+<span class="fc" id="L70">                buf.clear();</span>
+<span class="fc" id="L71">                b = ch.read(buf);</span>
+<span class="fc" id="L72">            }</span>
+<span class="fc" id="L73">            return md.digest();</span>
+<span class="pc bpc" id="L74" title="12 of 16 branches missed.">        }</span>
+    }
+
+    /**
+     * Calculates the MD5 checksum of a specified file.
+     *
+     * @param file the file to generate the MD5 checksum
+     * @return the hex representation of the MD5 hash
+     * @throws IOException when the file passed in does not exist
+     * @throws NoSuchAlgorithmException when the MD5 algorithm is not available
+     */
+    public static String getMD5Checksum(File file) throws IOException, NoSuchAlgorithmException {
+<span class="fc" id="L86">        final byte[] b = getChecksum(&quot;MD5&quot;, file);</span>
+<span class="fc" id="L87">        return getHex(b);</span>
+    }
+
+    /**
+     * Calculates the SHA1 checksum of a specified file.
+     *
+     * @param file the file to generate the MD5 checksum
+     * @return the hex representation of the SHA1 hash
+     * @throws IOException when the file passed in does not exist
+     * @throws NoSuchAlgorithmException when the SHA1 algorithm is not available
+     */
+    public static String getSHA1Checksum(File file) throws IOException, NoSuchAlgorithmException {
+<span class="fc" id="L99">        final byte[] b = getChecksum(&quot;SHA1&quot;, file);</span>
+<span class="fc" id="L100">        return getHex(b);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Converts a byte array into a hex string.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * This method was copied from &lt;a
+     * href=&quot;http://www.rgagnon.com/javadetails/java-0596.html&quot;&gt;http://www.rgagnon.com/javadetails/java-0596.html&lt;/a&gt;&lt;/p&gt;
+     *
+     * @param raw a byte array
+     * @return the hex representation of the byte array
+     */
+    public static String getHex(byte[] raw) {
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (raw == null) {</span>
+<span class="nc" id="L116">            return null;</span>
+        }
+<span class="fc" id="L118">        final StringBuilder hex = new StringBuilder(2 * raw.length);</span>
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        for (final byte b : raw) {</span>
+<span class="fc" id="L120">            hex.append(HEXES.charAt((b &amp; 0xF0) &gt;&gt; 4)).append(HEXES.charAt(b &amp; 0x0F));</span>
+        }
+<span class="fc" id="L122">        return hex.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

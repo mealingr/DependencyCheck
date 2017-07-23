@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DependencyMergingAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">DependencyMergingAnalyzer.java</span></div><h1>DependencyMergingAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.File;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.ListIterator;
+import java.util.Set;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * &lt;p&gt;
+ * This analyzer will merge dependencies, created from different source, into a
+ * single dependency.&lt;/p&gt;
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L39">public class DependencyMergingAnalyzer extends AbstractAnalyzer {</span>
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;Constants and Member Variables&quot;&gt;
+    /**
+     * The Logger.
+     */
+<span class="fc" id="L45">    private static final Logger LOGGER = LoggerFactory.getLogger(DependencyMergingAnalyzer.class);</span>
+    /**
+     * a flag indicating if this analyzer has run. This analyzer only runs once.
+     */
+<span class="fc" id="L49">    private boolean analyzed = false;</span>
+
+    /**
+     * Returns a flag indicating if this analyzer has run. This analyzer only
+     * runs once. Note this is currently only used in the unit tests.
+     *
+     * @return a flag indicating if this analyzer has run. This analyzer only
+     * runs once
+     */
+    protected synchronized boolean getAnalyzed() {
+<span class="nc" id="L59">        return analyzed;</span>
+    }
+
+    //&lt;/editor-fold&gt;
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;All standard implementation details of Analyzer&quot;&gt;
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;Dependency Merging Analyzer&quot;;
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L71">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.POST_INFORMATION_COLLECTION;</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L80">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L90">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * Does not support parallel processing as it only runs once and then
+     * operates on &lt;em&gt;all&lt;/em&gt; dependencies.
+     *
+     * @return whether or not parallel processing is enabled
+     * @see #analyze(Dependency, Engine)
+     */
+    @Override
+    public boolean supportsParallelProcessing() {
+<span class="fc" id="L102">        return false;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Returns the setting key to determine if the analyzer is enabled.&lt;/p&gt;
+     *
+     * @return the key for the analyzer's enabled property
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L113">        return Settings.KEYS.ANALYZER_DEPENDENCY_MERGING_ENABLED;</span>
+    }
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Analyzes a set of dependencies. If they have been found to be the same
+     * dependency created by more multiple FileTypeAnalyzers (i.e. a gemspec
+     * dependency and a dependency from the Bundle Audit Analyzer. The
+     * dependencies are then merged into a single reportable item.
+     *
+     * @param ignore this analyzer ignores the dependency being analyzed
+     * @param engine the engine that is scanning the dependencies
+     * @throws AnalysisException is thrown if there is an error reading the JAR
+     * file.
+     */
+    @Override
+    protected synchronized void analyzeDependency(Dependency ignore, Engine engine) throws AnalysisException {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (!analyzed) {</span>
+<span class="fc" id="L131">            analyzed = true;</span>
+<span class="fc" id="L132">            final Set&lt;Dependency&gt; dependenciesToRemove = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L133">            final ListIterator&lt;Dependency&gt; mainIterator = engine.getDependencies().listIterator();</span>
+            //for (Dependency nextDependency : engine.getDependencies()) {
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            while (mainIterator.hasNext()) {</span>
+<span class="fc" id="L136">                final Dependency dependency = mainIterator.next();</span>
+<span class="fc bfc" id="L137" title="All 4 branches covered.">                if (mainIterator.hasNext() &amp;&amp; !dependenciesToRemove.contains(dependency)) {</span>
+<span class="fc" id="L138">                    final ListIterator&lt;Dependency&gt; subIterator = engine.getDependencies().listIterator(mainIterator.nextIndex());</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">                    while (subIterator.hasNext()) {</span>
+<span class="fc" id="L140">                        final Dependency nextDependency = subIterator.next();</span>
+                        Dependency main;
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                        if ((main = getMainGemspecDependency(dependency, nextDependency)) != null) {</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                            if (main == dependency) {</span>
+<span class="fc" id="L144">                                mergeDependencies(dependency, nextDependency, dependenciesToRemove);</span>
+                            } else {
+<span class="nc" id="L146">                                mergeDependencies(nextDependency, dependency, dependenciesToRemove);</span>
+<span class="nc" id="L147">                                break; //since we merged into the next dependency - skip forward to the next in mainIterator</span>
+                            }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">                        } else if ((main = getMainSwiftDependency(dependency, nextDependency)) != null) {</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                            if (main == dependency) {</span>
+<span class="fc" id="L151">                                mergeDependencies(dependency, nextDependency, dependenciesToRemove);</span>
+                            } else {
+<span class="nc" id="L153">                                mergeDependencies(nextDependency, dependency, dependenciesToRemove);</span>
+<span class="nc" id="L154">                                break; //since we merged into the next dependency - skip forward to the next in mainIterator</span>
+                            }
+                        }
+<span class="fc" id="L157">                    }</span>
+                }
+<span class="fc" id="L159">            }</span>
+            //removing dependencies here as ensuring correctness and avoiding ConcurrentUpdateExceptions
+            // was difficult because of the inner iterator.
+<span class="fc" id="L162">            engine.getDependencies().removeAll(dependenciesToRemove);</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    /**
+     * Adds the relatedDependency to the dependency's related dependencies.
+     *
+     * @param dependency the main dependency
+     * @param relatedDependency a collection of dependencies to be removed from
+     * the main analysis loop, this is the source of dependencies to remove
+     * @param dependenciesToRemove a collection of dependencies that will be
+     * removed from the main analysis loop, this function adds to this
+     * collection
+     */
+    private void mergeDependencies(final Dependency dependency, final Dependency relatedDependency, final Set&lt;Dependency&gt; dependenciesToRemove) {
+<span class="fc" id="L177">        LOGGER.debug(&quot;Merging '{}' into '{}'&quot;, relatedDependency.getFilePath(), dependency.getFilePath());</span>
+<span class="fc" id="L178">        dependency.addRelatedDependency(relatedDependency);</span>
+<span class="fc" id="L179">        dependency.getVendorEvidence().getEvidence().addAll(relatedDependency.getVendorEvidence().getEvidence());</span>
+<span class="fc" id="L180">        dependency.getProductEvidence().getEvidence().addAll(relatedDependency.getProductEvidence().getEvidence());</span>
+<span class="fc" id="L181">        dependency.getVersionEvidence().getEvidence().addAll(relatedDependency.getVersionEvidence().getEvidence());</span>
+
+<span class="fc" id="L183">        final Iterator&lt;Dependency&gt; i = relatedDependency.getRelatedDependencies().iterator();</span>
+<span class="pc bpc" id="L184" title="1 of 2 branches missed.">        while (i.hasNext()) {</span>
+<span class="nc" id="L185">            dependency.addRelatedDependency(i.next());</span>
+<span class="nc" id="L186">            i.remove();</span>
+        }
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (dependency.getSha1sum().equals(relatedDependency.getSha1sum())) {</span>
+<span class="nc" id="L189">            dependency.addAllProjectReferences(relatedDependency.getProjectReferences());</span>
+        }
+<span class="fc" id="L191">        dependenciesToRemove.add(relatedDependency);</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Bundling Ruby gems that are identified from different .gemspec files but
+     * denote the same package path. This happens when Ruby bundler installs an
+     * application's dependencies by running &quot;bundle install&quot;.
+     *
+     * @param dependency1 dependency to compare
+     * @param dependency2 dependency to compare
+     * @return true if the the dependencies being analyzed appear to be the
+     * same; otherwise false
+     */
+    private boolean isSameRubyGem(Dependency dependency1, Dependency dependency2) {
+<span class="pc bpc" id="L205" title="4 of 12 branches missed.">        if (dependency1 == null || dependency2 == null</span>
+                || !dependency1.getFileName().endsWith(&quot;.gemspec&quot;)
+                || !dependency2.getFileName().endsWith(&quot;.gemspec&quot;)
+                || dependency1.getPackagePath() == null
+                || dependency2.getPackagePath() == null) {
+<span class="fc" id="L210">            return false;</span>
+        }
+<span class="fc" id="L212">        return dependency1.getPackagePath().equalsIgnoreCase(dependency2.getPackagePath());</span>
+    }
+
+    /**
+     * Ruby gems installed by &quot;bundle install&quot; can have zero or more *.gemspec
+     * files, all of which have the same packagePath and should be grouped. If
+     * one of these gemspec is from &lt;parent&gt;/specifications/*.gemspec, because
+     * it is a stub with fully resolved gem meta-data created by Ruby bundler,
+     * this dependency should be the main one. Otherwise, use dependency2 as
+     * main.
+     *
+     * This method returns null if any dependency is not from *.gemspec, or the
+     * two do not have the same packagePath. In this case, they should not be
+     * grouped.
+     *
+     * @param dependency1 dependency to compare
+     * @param dependency2 dependency to compare
+     * @return the main dependency; or null if a gemspec is not included in the
+     * analysis
+     */
+    private Dependency getMainGemspecDependency(Dependency dependency1, Dependency dependency2) {
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (isSameRubyGem(dependency1, dependency2)) {</span>
+<span class="fc" id="L234">            final File lFile = dependency1.getActualFile();</span>
+<span class="fc" id="L235">            final File left = lFile.getParentFile();</span>
+<span class="pc bpc" id="L236" title="2 of 4 branches missed.">            if (left != null &amp;&amp; left.getName().equalsIgnoreCase(&quot;specifications&quot;)) {</span>
+<span class="fc" id="L237">                return dependency1;</span>
+            }
+<span class="nc" id="L239">            return dependency2;</span>
+        }
+<span class="fc" id="L241">        return null;</span>
+    }
+
+    /**
+     * Bundling same swift dependencies with the same packagePath but identified
+     * by different file type analyzers.
+     *
+     * @param dependency1 dependency to test
+     * @param dependency2 dependency to test
+     * @return &lt;code&gt;true&lt;/code&gt; if the dependencies appear to be the same;
+     * otherwise &lt;code&gt;false&lt;/code&gt;
+     */
+    private boolean isSameSwiftPackage(Dependency dependency1, Dependency dependency2) {
+<span class="pc bpc" id="L254" title="5 of 16 branches missed.">        if (dependency1 == null || dependency2 == null</span>
+                || (!dependency1.getFileName().endsWith(&quot;.podspec&quot;)
+                &amp;&amp; !dependency1.getFileName().equals(&quot;Package.swift&quot;))
+                || (!dependency2.getFileName().endsWith(&quot;.podspec&quot;)
+                &amp;&amp; !dependency2.getFileName().equals(&quot;Package.swift&quot;))
+                || dependency1.getPackagePath() == null
+                || dependency2.getPackagePath() == null) {
+<span class="fc" id="L261">            return false;</span>
+        }
+<span class="fc" id="L263">        return dependency1.getPackagePath().equalsIgnoreCase(dependency2.getPackagePath());</span>
+    }
+
+    /**
+     * Determines which of the swift dependencies should be considered the
+     * primary.
+     *
+     * @param dependency1 the first swift dependency to compare
+     * @param dependency2 the second swift dependency to compare
+     * @return the primary swift dependency
+     */
+    private Dependency getMainSwiftDependency(Dependency dependency1, Dependency dependency2) {
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (isSameSwiftPackage(dependency1, dependency2)) {</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">            if (dependency1.getFileName().endsWith(&quot;.podspec&quot;)) {</span>
+<span class="fc" id="L277">                return dependency1;</span>
+            }
+<span class="nc" id="L279">            return dependency2;</span>
+        }
+<span class="fc" id="L281">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

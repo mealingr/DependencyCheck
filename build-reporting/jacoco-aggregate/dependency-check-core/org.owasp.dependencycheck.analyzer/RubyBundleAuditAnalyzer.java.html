@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RubyBundleAuditAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">RubyBundleAuditAnalyzer.java</span></div><h1>RubyBundleAuditAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2015 Institute for Defense Analyses. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileFilter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.io.FileUtils;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.data.nvdcve.CveDB;
+import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.Reference;
+import org.owasp.dependencycheck.dependency.Vulnerability;
+import org.owasp.dependencycheck.exception.InitializationException;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Used to analyze Ruby Bundler Gemspec.lock files utilizing the 3rd party
+ * bundle-audit tool.
+ *
+ * @author Dale Visser
+ */
+<span class="fc" id="L53">public class RubyBundleAuditAnalyzer extends AbstractFileTypeAnalyzer {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L58">    private static final Logger LOGGER = LoggerFactory.getLogger(RubyBundleAuditAnalyzer.class);</span>
+
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;Ruby Bundle Audit Analyzer&quot;;
+
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L68">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.PRE_INFORMATION_COLLECTION;</span>
+    /**
+     * The filter defining which files will be analyzed.
+     */
+<span class="fc" id="L72">    private static final FileFilter FILTER = FileFilterBuilder.newInstance().addFilenames(&quot;Gemfile.lock&quot;).build();</span>
+    /**
+     * Name.
+     */
+    public static final String NAME = &quot;Name: &quot;;
+    /**
+     * Version.
+     */
+    public static final String VERSION = &quot;Version: &quot;;
+    /**
+     * Advisory.
+     */
+    public static final String ADVISORY = &quot;Advisory: &quot;;
+    /**
+     * Criticality.
+     */
+    public static final String CRITICALITY = &quot;Criticality: &quot;;
+
+    /**
+     * The DAL.
+     */
+    private CveDB cvedb;
+
+    /**
+     * @return a filter that accepts files named Gemfile.lock
+     */
+    @Override
+    protected FileFilter getFileFilter() {
+<span class="fc" id="L100">        return FILTER;</span>
+    }
+
+    /**
+     * Launch bundle-audit.
+     *
+     * @param folder directory that contains bundle audit
+     * @return a handle to the process
+     * @throws AnalysisException thrown when there is an issue launching bundle
+     * audit
+     */
+    private Process launchBundleAudit(File folder) throws AnalysisException {
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (!folder.isDirectory()) {</span>
+<span class="nc" id="L113">            throw new AnalysisException(String.format(&quot;%s should have been a directory.&quot;, folder.getAbsolutePath()));</span>
+        }
+<span class="fc" id="L115">        final List&lt;String&gt; args = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L116">        final String bundleAuditPath = Settings.getString(Settings.KEYS.ANALYZER_BUNDLE_AUDIT_PATH);</span>
+<span class="fc" id="L117">        File bundleAudit = null;</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (bundleAuditPath != null) {</span>
+<span class="fc" id="L119">            bundleAudit = new File(bundleAuditPath);</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">            if (!bundleAudit.isFile()) {</span>
+<span class="fc" id="L121">                LOGGER.warn(&quot;Supplied `bundleAudit` path is incorrect: {}&quot;, bundleAuditPath);</span>
+<span class="fc" id="L122">                bundleAudit = null;</span>
+            }
+        }
+<span class="pc bpc" id="L125" title="3 of 4 branches missed.">        args.add(bundleAudit != null &amp;&amp; bundleAudit.isFile() ? bundleAudit.getAbsolutePath() : &quot;bundle-audit&quot;);</span>
+<span class="fc" id="L126">        args.add(&quot;check&quot;);</span>
+<span class="fc" id="L127">        args.add(&quot;--verbose&quot;);</span>
+<span class="fc" id="L128">        final ProcessBuilder builder = new ProcessBuilder(args);</span>
+<span class="fc" id="L129">        builder.directory(folder);</span>
+        try {
+<span class="fc" id="L131">            LOGGER.info(&quot;Launching: {} from {}&quot;, args, folder);</span>
+<span class="nc" id="L132">            return builder.start();</span>
+<span class="fc" id="L133">        } catch (IOException ioe) {</span>
+<span class="fc" id="L134">            throw new AnalysisException(&quot;bundle-audit initialization failure; this error can be ignored if you are not analyzing Ruby. &quot;</span>
+                    + &quot;Otherwise ensure that bundle-audit is installed and the path to bundle audit is correctly specified&quot;, ioe);
+        }
+    }
+
+    /**
+     * Initialize the analyzer. In this case, extract GrokAssembly.exe to a
+     * temporary location.
+     *
+     * @throws InitializationException if anything goes wrong
+     */
+    @Override
+    public void initializeFileTypeAnalyzer() throws InitializationException {
+        try {
+<span class="fc" id="L148">            cvedb = CveDB.getInstance();</span>
+<span class="nc" id="L149">        } catch (DatabaseException ex) {</span>
+<span class="nc" id="L150">            LOGGER.warn(&quot;Exception opening the database&quot;);</span>
+<span class="nc" id="L151">            LOGGER.debug(&quot;error&quot;, ex);</span>
+<span class="nc" id="L152">            setEnabled(false);</span>
+<span class="nc" id="L153">            throw new InitializationException(&quot;Error connecting to the database&quot;, ex);</span>
+<span class="fc" id="L154">        }</span>
+        // Now, need to see if bundle-audit actually runs from this location.
+<span class="fc" id="L156">        Process process = null;</span>
+        try {
+<span class="nc" id="L158">            process = launchBundleAudit(Settings.getTempDirectory());</span>
+<span class="fc" id="L159">        } catch (AnalysisException ae) {</span>
+
+<span class="fc" id="L161">            setEnabled(false);</span>
+<span class="fc" id="L162">            final String msg = String.format(&quot;Exception from bundle-audit process: %s. Disabling %s&quot;, ae.getCause(), ANALYZER_NAME);</span>
+<span class="fc" id="L163">            throw new InitializationException(msg, ae);</span>
+<span class="nc" id="L164">        } catch (IOException ex) {</span>
+<span class="nc" id="L165">            setEnabled(false);</span>
+<span class="nc" id="L166">            throw new InitializationException(&quot;Unable to create temporary file, the Ruby Bundle Audit Analyzer will be disabled&quot;, ex);</span>
+<span class="nc" id="L167">        }</span>
+
+        final int exitValue;
+        try {
+<span class="nc" id="L171">            exitValue = process.waitFor();</span>
+<span class="nc" id="L172">        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L173">            setEnabled(false);</span>
+<span class="nc" id="L174">            final String msg = String.format(&quot;Bundle-audit process was interrupted. Disabling %s&quot;, ANALYZER_NAME);</span>
+<span class="nc" id="L175">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L176">            throw new InitializationException(msg);</span>
+<span class="nc" id="L177">        }</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (0 == exitValue) {</span>
+<span class="nc" id="L179">            setEnabled(false);</span>
+<span class="nc" id="L180">            final String msg = String.format(&quot;Unexpected exit code from bundle-audit process. Disabling %s: %s&quot;, ANALYZER_NAME, exitValue);</span>
+<span class="nc" id="L181">            throw new InitializationException(msg);</span>
+        } else {
+<span class="nc" id="L183">            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream(), &quot;UTF-8&quot;))) {</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if (!reader.ready()) {</span>
+<span class="nc" id="L185">                    LOGGER.warn(&quot;Bundle-audit error stream unexpectedly not ready. Disabling {}&quot;, ANALYZER_NAME);</span>
+<span class="nc" id="L186">                    setEnabled(false);</span>
+<span class="nc" id="L187">                    throw new InitializationException(&quot;Bundle-audit error stream unexpectedly not ready.&quot;);</span>
+                } else {
+<span class="nc" id="L189">                    final String line = reader.readLine();</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">                    if (line == null || !line.contains(&quot;Errno::ENOENT&quot;)) {</span>
+<span class="nc" id="L191">                        LOGGER.warn(&quot;Unexpected bundle-audit output. Disabling {}: {}&quot;, ANALYZER_NAME, line);</span>
+<span class="nc" id="L192">                        setEnabled(false);</span>
+<span class="nc" id="L193">                        throw new InitializationException(&quot;Unexpected bundle-audit output.&quot;);</span>
+                    }
+                }
+<span class="nc bnc" id="L196" title="All 8 branches missed.">            } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L197">                setEnabled(false);</span>
+<span class="nc" id="L198">                throw new InitializationException(&quot;Unexpected bundle-audit encoding.&quot;, ex);</span>
+<span class="nc" id="L199">            } catch (IOException ex) {</span>
+<span class="nc" id="L200">                setEnabled(false);</span>
+<span class="nc" id="L201">                throw new InitializationException(&quot;Unable to read bundle-audit output.&quot;, ex);</span>
+<span class="nc" id="L202">            }</span>
+        }
+
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (isEnabled()) {</span>
+<span class="nc" id="L206">            LOGGER.info(&quot;{} is enabled. It is necessary to manually run \&quot;bundle-audit update\&quot; &quot;</span>
+                    + &quot;occasionally to keep its database up to date.&quot;, ANALYZER_NAME);
+        }
+<span class="nc" id="L209">    }</span>
+
+    /**
+     * Closes the data source.
+     */
+    @Override
+    public void closeAnalyzer() {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (cvedb != null) {</span>
+<span class="nc" id="L217">            cvedb.close();</span>
+<span class="nc" id="L218">            cvedb = null;</span>
+        }
+<span class="fc" id="L220">    }</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L229">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L239">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * Returns the key used in the properties file to reference the analyzer's
+     * enabled property.
+     *
+     * @return the analyzer's enabled property setting key
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L250">        return Settings.KEYS.ANALYZER_BUNDLE_AUDIT_ENABLED;</span>
+    }
+
+    /**
+     * If {@link #analyzeDependency(Dependency, Engine)} is called, then we have
+     * successfully initialized, and it will be necessary to disable
+     * {@link RubyGemspecAnalyzer}.
+     */
+<span class="fc" id="L258">    private boolean needToDisableGemspecAnalyzer = true;</span>
+
+    /**
+     * Determines if the analyzer can analyze the given file type.
+     *
+     * @param dependency the dependency to determine if it can analyze
+     * @param engine the dependency-check engine
+     * @throws AnalysisException thrown if there is an analysis exception.
+     */
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine)
+            throws AnalysisException {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (needToDisableGemspecAnalyzer) {</span>
+<span class="nc" id="L271">            boolean failed = true;</span>
+<span class="nc" id="L272">            final String className = RubyGemspecAnalyzer.class.getName();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            for (FileTypeAnalyzer analyzer : engine.getFileTypeAnalyzers()) {</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">                if (analyzer instanceof RubyBundlerAnalyzer) {</span>
+<span class="nc" id="L275">                    ((RubyBundlerAnalyzer) analyzer).setEnabled(false);</span>
+<span class="nc" id="L276">                    LOGGER.info(&quot;Disabled {} to avoid noisy duplicate results.&quot;, RubyBundlerAnalyzer.class.getName());</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">                } else if (analyzer instanceof RubyGemspecAnalyzer) {</span>
+<span class="nc" id="L278">                    ((RubyGemspecAnalyzer) analyzer).setEnabled(false);</span>
+<span class="nc" id="L279">                    LOGGER.info(&quot;Disabled {} to avoid noisy duplicate results.&quot;, className);</span>
+<span class="nc" id="L280">                    failed = false;</span>
+                }
+<span class="nc" id="L282">            }</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            if (failed) {</span>
+<span class="nc" id="L284">                LOGGER.warn(&quot;Did not find {}.&quot;, className);</span>
+            }
+<span class="nc" id="L286">            needToDisableGemspecAnalyzer = false;</span>
+        }
+<span class="nc" id="L288">        final File parentFile = dependency.getActualFile().getParentFile();</span>
+<span class="nc" id="L289">        final Process process = launchBundleAudit(parentFile);</span>
+        final int exitValue;
+        try {
+<span class="nc" id="L292">            exitValue = process.waitFor();</span>
+<span class="nc" id="L293">        } catch (InterruptedException ie) {</span>
+<span class="nc" id="L294">            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L295">            throw new AnalysisException(&quot;bundle-audit process interrupted&quot;, ie);</span>
+<span class="nc" id="L296">        }</span>
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        if (exitValue &lt; 0 || exitValue &gt; 1) {</span>
+<span class="nc" id="L298">            final String msg = String.format(&quot;Unexpected exit code from bundle-audit process; exit code: %s&quot;, exitValue);</span>
+<span class="nc" id="L299">            throw new AnalysisException(msg);</span>
+        }
+        try {
+<span class="nc" id="L302">            try (BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream(), &quot;UTF-8&quot;))) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                while (errReader.ready()) {</span>
+<span class="nc" id="L304">                    final String error = errReader.readLine();</span>
+<span class="nc" id="L305">                    LOGGER.warn(error);</span>
+<span class="nc" id="L306">                }</span>
+<span class="nc bnc" id="L307" title="All 8 branches missed.">            }</span>
+<span class="nc" id="L308">            try (BufferedReader rdr = new BufferedReader(new InputStreamReader(process.getInputStream(), &quot;UTF-8&quot;))) {</span>
+<span class="nc" id="L309">                processBundlerAuditOutput(dependency, engine, rdr);</span>
+<span class="nc bnc" id="L310" title="All 8 branches missed.">            }</span>
+<span class="nc" id="L311">        } catch (IOException ioe) {</span>
+<span class="nc" id="L312">            LOGGER.warn(&quot;bundle-audit failure&quot;, ioe);</span>
+<span class="nc" id="L313">        }</span>
+<span class="nc" id="L314">    }</span>
+
+    /**
+     * Processes the bundler audit output.
+     *
+     * @param original the dependency
+     * @param engine the dependency-check engine
+     * @param rdr the reader of the report
+     * @throws IOException thrown if the report cannot be read.
+     */
+    private void processBundlerAuditOutput(Dependency original, Engine engine, BufferedReader rdr) throws IOException {
+<span class="nc" id="L325">        final String parentName = original.getActualFile().getParentFile().getName();</span>
+<span class="nc" id="L326">        final String fileName = original.getFileName();</span>
+<span class="nc" id="L327">        final String filePath = original.getFilePath();</span>
+<span class="nc" id="L328">        Dependency dependency = null;</span>
+<span class="nc" id="L329">        Vulnerability vulnerability = null;</span>
+<span class="nc" id="L330">        String gem = null;</span>
+<span class="nc" id="L331">        final Map&lt;String, Dependency&gt; map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L332">        boolean appendToDescription = false;</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        while (rdr.ready()) {</span>
+<span class="nc" id="L334">            final String nextLine = rdr.readLine();</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (null == nextLine) {</span>
+<span class="nc" id="L336">                break;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            } else if (nextLine.startsWith(NAME)) {</span>
+<span class="nc" id="L338">                appendToDescription = false;</span>
+<span class="nc" id="L339">                gem = nextLine.substring(NAME.length());</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">                if (!map.containsKey(gem)) {</span>
+<span class="nc" id="L341">                    map.put(gem, createDependencyForGem(engine, parentName, fileName, filePath, gem));</span>
+                }
+<span class="nc" id="L343">                dependency = map.get(gem);</span>
+<span class="nc" id="L344">                LOGGER.debug(&quot;bundle-audit ({}): {}&quot;, parentName, nextLine);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            } else if (nextLine.startsWith(VERSION)) {</span>
+<span class="nc" id="L346">                vulnerability = createVulnerability(parentName, dependency, gem, nextLine);</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            } else if (nextLine.startsWith(ADVISORY)) {</span>
+<span class="nc" id="L348">                setVulnerabilityName(parentName, dependency, vulnerability, nextLine);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">            } else if (nextLine.startsWith(CRITICALITY)) {</span>
+<span class="nc" id="L350">                addCriticalityToVulnerability(parentName, vulnerability, nextLine);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            } else if (nextLine.startsWith(&quot;URL: &quot;)) {</span>
+<span class="nc" id="L352">                addReferenceToVulnerability(parentName, vulnerability, nextLine);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            } else if (nextLine.startsWith(&quot;Description:&quot;)) {</span>
+<span class="nc" id="L354">                appendToDescription = true;</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                if (null != vulnerability) {</span>
+<span class="nc" id="L356">                    vulnerability.setDescription(&quot;*** Vulnerability obtained from bundle-audit verbose report. &quot;</span>
+                            + &quot;Title link may not work. CPE below is guessed. CVSS score is estimated (-1.0 &quot;
+                            + &quot; indicates unknown). See link below for full details. *** &quot;);
+                }
+<span class="nc bnc" id="L360" title="All 4 branches missed.">            } else if (appendToDescription &amp;&amp; null != vulnerability) {</span>
+<span class="nc" id="L361">                vulnerability.setDescription(vulnerability.getDescription() + nextLine + &quot;\n&quot;);</span>
+            }
+<span class="nc" id="L363">        }</span>
+<span class="nc" id="L364">    }</span>
+
+    /**
+     * Sets the vulnerability name.
+     *
+     * @param parentName the parent name
+     * @param dependency the dependency
+     * @param vulnerability the vulnerability
+     * @param nextLine the line to parse
+     */
+    private void setVulnerabilityName(String parentName, Dependency dependency, Vulnerability vulnerability, String nextLine) {
+<span class="nc" id="L375">        final String advisory = nextLine.substring((ADVISORY.length()));</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (null != vulnerability) {</span>
+<span class="nc" id="L377">            vulnerability.setName(advisory);</span>
+        }
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        if (null != dependency) {</span>
+<span class="nc" id="L380">            dependency.getVulnerabilities().add(vulnerability); // needed to wait for vulnerability name to avoid NPE</span>
+        }
+<span class="nc" id="L382">        LOGGER.debug(&quot;bundle-audit ({}): {}&quot;, parentName, nextLine);</span>
+<span class="nc" id="L383">    }</span>
+
+    /**
+     * Adds a reference to the vulnerability.
+     *
+     * @param parentName the parent name
+     * @param vulnerability the vulnerability
+     * @param nextLine the line to parse
+     */
+    private void addReferenceToVulnerability(String parentName, Vulnerability vulnerability, String nextLine) {
+<span class="nc" id="L393">        final String url = nextLine.substring((&quot;URL: &quot;).length());</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">        if (null != vulnerability) {</span>
+<span class="nc" id="L395">            final Reference ref = new Reference();</span>
+<span class="nc" id="L396">            ref.setName(vulnerability.getName());</span>
+<span class="nc" id="L397">            ref.setSource(&quot;bundle-audit&quot;);</span>
+<span class="nc" id="L398">            ref.setUrl(url);</span>
+<span class="nc" id="L399">            vulnerability.getReferences().add(ref);</span>
+        }
+<span class="nc" id="L401">        LOGGER.debug(&quot;bundle-audit ({}): {}&quot;, parentName, nextLine);</span>
+<span class="nc" id="L402">    }</span>
+
+    /**
+     * Adds the criticality to the vulnerability
+     *
+     * @param parentName the parent name
+     * @param vulnerability the vulnerability
+     * @param nextLine the line to parse
+     */
+    private void addCriticalityToVulnerability(String parentName, Vulnerability vulnerability, String nextLine) {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (null != vulnerability) {</span>
+<span class="nc" id="L413">            final String criticality = nextLine.substring(CRITICALITY.length()).trim();</span>
+<span class="nc" id="L414">            float score = -1.0f;</span>
+<span class="nc" id="L415">            Vulnerability v = null;</span>
+            try {
+<span class="nc" id="L417">                v = cvedb.getVulnerability(vulnerability.getName());</span>
+<span class="nc" id="L418">            } catch (DatabaseException ex) {</span>
+<span class="nc" id="L419">                LOGGER.debug(&quot;Unable to look up vulnerability {}&quot;, vulnerability.getName());</span>
+<span class="nc" id="L420">            }</span>
+<span class="nc bnc" id="L421" title="All 2 branches missed.">            if (v != null) {</span>
+<span class="nc" id="L422">                score = v.getCvssScore();</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">            } else if (&quot;High&quot;.equalsIgnoreCase(criticality)) {</span>
+<span class="nc" id="L424">                score = 8.5f;</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">            } else if (&quot;Medium&quot;.equalsIgnoreCase(criticality)) {</span>
+<span class="nc" id="L426">                score = 5.5f;</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">            } else if (&quot;Low&quot;.equalsIgnoreCase(criticality)) {</span>
+<span class="nc" id="L428">                score = 2.0f;</span>
+            }
+<span class="nc" id="L430">            vulnerability.setCvssScore(score);</span>
+        }
+<span class="nc" id="L432">        LOGGER.debug(&quot;bundle-audit ({}): {}&quot;, parentName, nextLine);</span>
+<span class="nc" id="L433">    }</span>
+
+    /**
+     * Creates a vulnerability.
+     *
+     * @param parentName the parent name
+     * @param dependency the dependency
+     * @param gem the gem name
+     * @param nextLine the line to parse
+     * @return the vulnerability
+     */
+    private Vulnerability createVulnerability(String parentName, Dependency dependency, String gem, String nextLine) {
+<span class="nc" id="L445">        Vulnerability vulnerability = null;</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (null != dependency) {</span>
+<span class="nc" id="L447">            final String version = nextLine.substring(VERSION.length());</span>
+<span class="nc" id="L448">            dependency.getVersionEvidence().addEvidence(</span>
+                    &quot;bundler-audit&quot;,
+                    &quot;Version&quot;,
+                    version,
+                    Confidence.HIGHEST);
+<span class="nc" id="L453">            vulnerability = new Vulnerability(); // don't add to dependency until we have name set later</span>
+<span class="nc" id="L454">            vulnerability.setMatchedCPE(</span>
+                    String.format(&quot;cpe:/a:%1$s_project:%1$s:%2$s::~~~ruby~~&quot;, gem, version),
+                    null);
+<span class="nc" id="L457">            vulnerability.setCvssAccessVector(&quot;-&quot;);</span>
+<span class="nc" id="L458">            vulnerability.setCvssAccessComplexity(&quot;-&quot;);</span>
+<span class="nc" id="L459">            vulnerability.setCvssAuthentication(&quot;-&quot;);</span>
+<span class="nc" id="L460">            vulnerability.setCvssAvailabilityImpact(&quot;-&quot;);</span>
+<span class="nc" id="L461">            vulnerability.setCvssConfidentialityImpact(&quot;-&quot;);</span>
+<span class="nc" id="L462">            vulnerability.setCvssIntegrityImpact(&quot;-&quot;);</span>
+        }
+<span class="nc" id="L464">        LOGGER.debug(&quot;bundle-audit ({}): {}&quot;, parentName, nextLine);</span>
+<span class="nc" id="L465">        return vulnerability;</span>
+    }
+
+    /**
+     * Creates the dependency based off of the gem.
+     *
+     * @param engine the engine used for scanning
+     * @param parentName the gem parent
+     * @param fileName the file name
+     * @param filePath the file path
+     * @param gem the gem name
+     * @return the dependency to add
+     * @throws IOException thrown if a temporary gem file could not be written
+     */
+    private Dependency createDependencyForGem(Engine engine, String parentName, String fileName, String filePath, String gem) throws IOException {
+<span class="nc" id="L480">        final File gemFile = new File(Settings.getTempDirectory(), gem + &quot;_Gemfile.lock&quot;);</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (!gemFile.createNewFile()) {</span>
+<span class="nc" id="L482">            throw new IOException(&quot;Unable to create temporary gem file&quot;);</span>
+        }
+<span class="nc" id="L484">        final String displayFileName = String.format(&quot;%s%c%s:%s&quot;, parentName, File.separatorChar, fileName, gem);</span>
+
+<span class="nc" id="L486">        FileUtils.write(gemFile, displayFileName, Charset.defaultCharset()); // unique contents to avoid dependency bundling</span>
+<span class="nc" id="L487">        final Dependency dependency = new Dependency(gemFile);</span>
+<span class="nc" id="L488">        dependency.getProductEvidence().addEvidence(&quot;bundler-audit&quot;, &quot;Name&quot;, gem, Confidence.HIGHEST);</span>
+<span class="nc" id="L489">        dependency.setDisplayFileName(displayFileName);</span>
+<span class="nc" id="L490">        dependency.setFileName(fileName);</span>
+<span class="nc" id="L491">        dependency.setFilePath(filePath);</span>
+<span class="nc" id="L492">        engine.getDependencies().add(dependency);</span>
+<span class="nc" id="L493">        return dependency;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

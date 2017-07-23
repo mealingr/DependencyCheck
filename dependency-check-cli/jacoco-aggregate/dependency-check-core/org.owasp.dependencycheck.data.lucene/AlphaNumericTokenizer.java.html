@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AlphaNumericTokenizer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.lucene</a> &gt; <span class="el_source">AlphaNumericTokenizer.java</span></div><h1>AlphaNumericTokenizer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.lucene;
+
+import java.io.Reader;
+import org.apache.lucene.analysis.util.CharTokenizer;
+import org.apache.lucene.util.Version;
+
+/**
+ * Tokenizes the input breaking it into tokens when non-alpha/numeric characters are found.
+ *
+ * @author Jeremy Long
+ */
+public class AlphaNumericTokenizer extends CharTokenizer {
+
+    /**
+     * Constructs a new AlphaNumericTokenizer.
+     *
+     * @param matchVersion the lucene version
+     * @param in the Reader
+     */
+    public AlphaNumericTokenizer(Version matchVersion, Reader in) {
+<span class="fc" id="L38">        super(matchVersion, in);</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Constructs a new AlphaNumericTokenizer.
+     *
+     * @param matchVersion the lucene version
+     * @param factory the AttributeFactory
+     * @param in the Reader
+     */
+    public AlphaNumericTokenizer(Version matchVersion, AttributeFactory factory, Reader in) {
+<span class="nc" id="L49">        super(matchVersion, factory, in);</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Determines if the char passed in is part of a token.
+     *
+     * @param c the char being analyzed
+     * @return true if the char is a letter or digit, otherwise false
+     */
+    @Override
+    protected boolean isTokenChar(int c) {
+<span class="fc bfc" id="L60" title="All 4 branches covered.">        return Character.isLetter(c) || Character.isDigit(c);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

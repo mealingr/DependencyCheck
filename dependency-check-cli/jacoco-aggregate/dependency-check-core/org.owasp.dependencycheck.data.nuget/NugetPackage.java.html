@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NugetPackage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.nuget</a> &gt; <span class="el_source">NugetPackage.java</span></div><h1>NugetPackage.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2014 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.nuget;
+
+/**
+ * Represents the contents of a Nuspec manifest.
+ *
+ * @author colezlaw
+ */
+<span class="fc" id="L25">public class NugetPackage {</span>
+    /**
+     * The id.
+     */
+    private String id;
+
+    /**
+     * The version.
+     */
+    private String version;
+
+    /**
+     * The title.
+     */
+    private String title;
+
+    /**
+     * The authors.
+     */
+    private String authors;
+
+    /**
+     * The owners.
+     */
+    private String owners;
+
+    /**
+     * The licenseUrl.
+     */
+    private String licenseUrl;
+
+    /**
+     * Sets the id.
+     * @param id the id
+     */
+    public void setId(String id) {
+<span class="fc" id="L61">        this.id = id;</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Gets the id.
+     * @return the id
+     */
+    public String getId() {
+<span class="fc" id="L69">        return id;</span>
+    }
+
+    /**
+     * Sets the version.
+     * @param version the version
+     */
+    public void setVersion(String version) {
+<span class="fc" id="L77">        this.version = version;</span>
+<span class="fc" id="L78">    }</span>
+
+    /**
+     * Gets the version.
+     * @return the version
+     */
+    public String getVersion() {
+<span class="fc" id="L85">        return version;</span>
+    }
+
+    /**
+     * Sets the title.
+     * @param title the title
+     */
+    public void setTitle(String title) {
+<span class="fc" id="L93">        this.title = title;</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Gets the title.
+     * @return the title
+     */
+    public String getTitle() {
+<span class="fc" id="L101">        return title;</span>
+    }
+
+    /**
+     * Sets the authors.
+     * @param authors the authors
+     */
+    public void setAuthors(String authors) {
+<span class="fc" id="L109">        this.authors = authors;</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Gets the authors.
+     * @return the authors
+     */
+    public String getAuthors() {
+<span class="fc" id="L117">        return authors;</span>
+    }
+
+    /**
+     * Sets the owners.
+     * @param owners the owners
+     */
+    public void setOwners(String owners) {
+<span class="fc" id="L125">        this.owners = owners;</span>
+<span class="fc" id="L126">    }</span>
+
+    /**
+     * Gets the owners.
+     * @return the owners
+     */
+    public String getOwners() {
+<span class="fc" id="L133">        return owners;</span>
+    }
+
+    /**
+     * Sets the licenseUrl.
+     * @param licenseUrl the licenseUrl
+     */
+    public void setLicenseUrl(String licenseUrl) {
+<span class="fc" id="L141">        this.licenseUrl = licenseUrl;</span>
+<span class="fc" id="L142">    }</span>
+
+    /**
+     * Gets the licenseUrl.
+     * @return the licenseUrl
+     */
+    public String getLicenseUrl() {
+<span class="fc" id="L149">        return licenseUrl;</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L154" title="All 2 branches missed.">        if (this == other) {</span>
+<span class="nc" id="L155">            return true;</span>
+        }
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (other == null || other.getClass() != this.getClass()) {</span>
+<span class="nc" id="L158">            return false;</span>
+        }
+<span class="nc" id="L160">        final NugetPackage o = (NugetPackage) other;</span>
+<span class="nc bnc" id="L161" title="All 12 branches missed.">        return o.getId().equals(id)</span>
+                &amp;&amp; o.getVersion().equals(version)
+                &amp;&amp; o.getTitle().equals(title)
+                &amp;&amp; o.getAuthors().equals(authors)
+                &amp;&amp; o.getOwners().equals(owners)
+                &amp;&amp; o.getLicenseUrl().equals(licenseUrl);
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L171">        int hash = 7;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        hash = 31 * hash + (null == id ? 0 : id.hashCode());</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        hash = 31 * hash + (null == version ? 0 : version.hashCode());</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        hash = 31 * hash + (null == title ? 0 : title.hashCode());</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        hash = 31 * hash + (null == authors ? 0 : authors.hashCode());</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        hash = 31 * hash + (null == owners ? 0 : owners.hashCode());</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        hash = 31 * hash + (null == licenseUrl ? 0 : licenseUrl.hashCode());</span>
+<span class="nc" id="L178">        return hash;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

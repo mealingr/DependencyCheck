@@ -1,0 +1,1036 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Settings.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-utils</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.utils</a> &gt; <span class="el_source">Settings.java</span></div><h1>Settings.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.utils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.security.ProtectionDomain;
+import java.util.Enumeration;
+import java.util.Properties;
+
+import org.apache.commons.lang3.StringUtils;
+
+/**
+ * A simple settings container that wraps the dependencycheck.properties file.
+ *
+ * @author Jeremy Long
+ */
+public final class Settings {
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L48">    private static final Logger LOGGER = LoggerFactory.getLogger(Settings.class);</span>
+    /**
+     * The properties file location.
+     */
+    private static final String PROPERTIES_FILE = &quot;dependencycheck.properties&quot;;
+    /**
+     * Array separator.
+     */
+    private static final String ARRAY_SEP = &quot;,&quot;;
+    /**
+     * Thread local settings.
+     */
+<span class="fc" id="L60">    private static final ThreadLocal&lt;Settings&gt; LOCAL_SETTINGS = new ThreadLocal&lt;&gt;();</span>
+    /**
+     * The properties.
+     */
+<span class="fc" id="L64">    private Properties props = null;</span>
+
+    /**
+     * A reference to the temporary directory; used in case it needs to be
+     * deleted during cleanup.
+     */
+<span class="fc" id="L70">    private static File tempDirectory = null;</span>
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;KEYS used to access settings&quot;&gt;
+    /**
+     * The collection of keys used within the properties file.
+     */
+    public static final class KEYS {
+
+        /**
+         * The key to obtain the application name.
+         */
+        public static final String APPLICATION_NAME = &quot;application.name&quot;;
+        /**
+         * The key to obtain the application version.
+         */
+        public static final String APPLICATION_VERSION = &quot;application.version&quot;;
+        /**
+         * The key to obtain the URL to retrieve the current release version
+         * from.
+         */
+        public static final String ENGINE_VERSION_CHECK_URL = &quot;engine.version.url&quot;;
+        /**
+         * The properties key indicating whether or not the cached data sources
+         * should be updated.
+         */
+        public static final String AUTO_UPDATE = &quot;autoupdate&quot;;
+        /**
+         * The database driver class name. If this is not in the properties file
+         * the embedded database is used.
+         */
+        public static final String DB_DRIVER_NAME = &quot;data.driver_name&quot;;
+        /**
+         * The database driver class name. If this is not in the properties file
+         * the embedded database is used.
+         */
+        public static final String DB_DRIVER_PATH = &quot;data.driver_path&quot;;
+        /**
+         * The database connection string. If this is not in the properties file
+         * the embedded database is used.
+         */
+        public static final String DB_CONNECTION_STRING = &quot;data.connection_string&quot;;
+        /**
+         * The username to use when connecting to the database.
+         */
+        public static final String DB_USER = &quot;data.user&quot;;
+        /**
+         * The password to authenticate to the database.
+         */
+        public static final String DB_PASSWORD = &quot;data.password&quot;;
+        /**
+         * The base path to use for the data directory (for embedded db).
+         */
+        public static final String DATA_DIRECTORY = &quot;data.directory&quot;;
+        /**
+         * The database file name.
+         */
+        public static final String DB_FILE_NAME = &quot;data.file_name&quot;;
+        /**
+         * The database schema version.
+         */
+        public static final String DB_VERSION = &quot;data.version&quot;;
+        /**
+         * The starts with filter used to exclude CVE entries from the database.
+         * By default this is set to 'cpe:/a:' which limits the CVEs imported to
+         * just those that are related to applications. If this were set to just
+         * 'cpe:' the OS, hardware, and application related CVEs would be
+         * imported.
+         */
+        public static final String CVE_CPE_STARTS_WITH_FILTER = &quot;cve.cpe.startswith.filter&quot;;
+        /**
+         * The properties key for the URL to retrieve the &quot;meta&quot; data from about
+         * the CVE entries.
+         *
+         * @deprecated this is not currently used
+         */
+        @Deprecated
+        public static final String CVE_META_URL = &quot;cve.url.meta&quot;;
+        /**
+         * The properties key for the URL to retrieve the recently modified and
+         * added CVE entries (last 8 days) using the 2.0 schema.
+         */
+        public static final String CVE_MODIFIED_20_URL = &quot;cve.url-2.0.modified&quot;;
+        /**
+         * The properties key for the URL to retrieve the recently modified and
+         * added CVE entries (last 8 days) using the 2.0 schema.
+         */
+        public static final String CVE_ORIGINAL_MODIFIED_20_URL = &quot;cve.url-2.0.original&quot;;
+        /**
+         * The properties key for the URL to retrieve the recently modified and
+         * added CVE entries (last 8 days) using the 1.2 schema.
+         */
+        public static final String CVE_MODIFIED_12_URL = &quot;cve.url-1.2.modified&quot;;
+        /**
+         * The properties key for the URL to retrieve the recently modified and
+         * added CVE entries (last 8 days).
+         */
+        public static final String CVE_MODIFIED_VALID_FOR_DAYS = &quot;cve.url.modified.validfordays&quot;;
+        /**
+         * The properties key to control the skipping of the check for CVE
+         * updates.
+         */
+        public static final String CVE_CHECK_VALID_FOR_HOURS = &quot;cve.check.validforhours&quot;;
+        /**
+         * The properties key for the telling us how many cve.url.* URLs exists.
+         * This is used in combination with CVE_BASE_URL to be able to retrieve
+         * the URLs for all of the files that make up the NVD CVE listing.
+         */
+        public static final String CVE_START_YEAR = &quot;cve.startyear&quot;;
+        /**
+         * The properties key for the CVE schema version 1.2.
+         */
+        public static final String CVE_SCHEMA_1_2 = &quot;cve.url-1.2.base&quot;;
+        /**
+         * The properties key for the CVE schema version 2.0.
+         */
+        public static final String CVE_SCHEMA_2_0 = &quot;cve.url-2.0.base&quot;;
+        /**
+         * The properties key that indicates how often the CPE data needs to be
+         * updated.
+         */
+        public static final String CPE_MODIFIED_VALID_FOR_DAYS = &quot;cpe.validfordays&quot;;
+        /**
+         * The properties key for the URL to retrieve the CPE.
+         */
+        public static final String CPE_URL = &quot;cpe.url&quot;;
+        /**
+         * Whether or not if using basic auth with a proxy the system setting
+         * 'jdk.http.auth.tunneling.disabledSchemes' should be set to an empty
+         * string.
+         */
+        public static final String PROXY_DISABLE_SCHEMAS = &quot;proxy.disableSchemas&quot;;
+        /**
+         * The properties key for the proxy server.
+         *
+         * @deprecated use
+         * {@link org.owasp.dependencycheck.utils.Settings.KEYS#PROXY_SERVER}
+         * instead.
+         */
+        @Deprecated
+        public static final String PROXY_URL = &quot;proxy.server&quot;;
+        /**
+         * The properties key for the proxy server.
+         */
+        public static final String PROXY_SERVER = &quot;proxy.server&quot;;
+        /**
+         * The properties key for the proxy port - this must be an integer
+         * value.
+         */
+        public static final String PROXY_PORT = &quot;proxy.port&quot;;
+        /**
+         * The properties key for the proxy username.
+         */
+        public static final String PROXY_USERNAME = &quot;proxy.username&quot;;
+        /**
+         * The properties key for the proxy password.
+         */
+        public static final String PROXY_PASSWORD = &quot;proxy.password&quot;;
+        /**
+         * The properties key for the non proxy hosts.
+         */
+        public static final String PROXY_NON_PROXY_HOSTS = &quot;proxy.nonproxyhosts&quot;;
+        /**
+         * The properties key for the connection timeout.
+         */
+        public static final String CONNECTION_TIMEOUT = &quot;connection.timeout&quot;;
+        /**
+         * The location of the temporary directory.
+         */
+        public static final String TEMP_DIRECTORY = &quot;temp.directory&quot;;
+        /**
+         * The maximum number of threads to allocate when downloading files.
+         */
+        public static final String MAX_DOWNLOAD_THREAD_POOL_SIZE = &quot;max.download.threads&quot;;
+        /**
+         * The key for the suppression file.
+         */
+        public static final String SUPPRESSION_FILE = &quot;suppression.file&quot;;
+        /**
+         * The key for the hint file.
+         */
+        public static final String HINTS_FILE = &quot;hints.file&quot;;
+        /**
+         * The properties key for whether the Jar Analyzer is enabled.
+         */
+        public static final String ANALYZER_JAR_ENABLED = &quot;analyzer.jar.enabled&quot;;
+        /**
+         * The properties key for whether experimental analyzers are loaded.
+         */
+        public static final String ANALYZER_EXPERIMENTAL_ENABLED = &quot;analyzer.experimental.enabled&quot;;
+        /**
+         * The properties key for whether the Archive analyzer is enabled.
+         */
+        public static final String ANALYZER_ARCHIVE_ENABLED = &quot;analyzer.archive.enabled&quot;;
+        /**
+         * The properties key for whether the node.js package analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_NODE_PACKAGE_ENABLED = &quot;analyzer.node.package.enabled&quot;;
+        /**
+         * The properties key for whether the Node Security Platform (nsp)
+         * analyzer is enabled.
+         */
+        public static final String ANALYZER_NSP_PACKAGE_ENABLED = &quot;analyzer.nsp.package.enabled&quot;;
+        /**
+         * The properties key for whether the Nexus analyzer is enabled.
+         */
+        public static final String ANALYZER_NSP_URL = &quot;analyzer.nsp.url&quot;;
+        /**
+         * The properties key for whether the composer lock file analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_COMPOSER_LOCK_ENABLED = &quot;analyzer.composer.lock.enabled&quot;;
+        /**
+         * The properties key for whether the Python Distribution analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_PYTHON_DISTRIBUTION_ENABLED = &quot;analyzer.python.distribution.enabled&quot;;
+        /**
+         * The properties key for whether the Python Package analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_PYTHON_PACKAGE_ENABLED = &quot;analyzer.python.package.enabled&quot;;
+        /**
+         * The properties key for whether the Ruby Gemspec Analyzer is enabled.
+         */
+        public static final String ANALYZER_RUBY_GEMSPEC_ENABLED = &quot;analyzer.ruby.gemspec.enabled&quot;;
+        /**
+         * The properties key for whether the Autoconf analyzer is enabled.
+         */
+        public static final String ANALYZER_AUTOCONF_ENABLED = &quot;analyzer.autoconf.enabled&quot;;
+        /**
+         * The properties key for whether the CMake analyzer is enabled.
+         */
+        public static final String ANALYZER_CMAKE_ENABLED = &quot;analyzer.cmake.enabled&quot;;
+        /**
+         * The properties key for whether the Ruby Bundler Audit analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_BUNDLE_AUDIT_ENABLED = &quot;analyzer.bundle.audit.enabled&quot;;
+        /**
+         * The properties key for whether the .NET Assembly analyzer is enabled.
+         */
+        public static final String ANALYZER_ASSEMBLY_ENABLED = &quot;analyzer.assembly.enabled&quot;;
+        /**
+         * The properties key for whether the .NET Nuspec analyzer is enabled.
+         */
+        public static final String ANALYZER_NUSPEC_ENABLED = &quot;analyzer.nuspec.enabled&quot;;
+        /**
+         * The properties key for whether the Nexus analyzer is enabled.
+         */
+        public static final String ANALYZER_NEXUS_ENABLED = &quot;analyzer.nexus.enabled&quot;;
+        /**
+         * The properties key for the Nexus search URL.
+         */
+        public static final String ANALYZER_NEXUS_URL = &quot;analyzer.nexus.url&quot;;
+        /**
+         * The properties key for using the proxy to reach Nexus.
+         */
+        public static final String ANALYZER_NEXUS_USES_PROXY = &quot;analyzer.nexus.proxy&quot;;
+        /**
+         * The properties key for whether the Central analyzer is enabled.
+         */
+        public static final String ANALYZER_CENTRAL_ENABLED = &quot;analyzer.central.enabled&quot;;
+        /**
+         * The properties key for whether the OpenSSL analyzer is enabled.
+         */
+        public static final String ANALYZER_OPENSSL_ENABLED = &quot;analyzer.openssl.enabled&quot;;
+        /**
+         * The properties key for whether the cocoapods analyzer is enabled.
+         */
+        public static final String ANALYZER_COCOAPODS_ENABLED = &quot;analyzer.cocoapods.enabled&quot;;
+        /**
+         * The properties key for whether the SWIFT package manager analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_SWIFT_PACKAGE_MANAGER_ENABLED = &quot;analyzer.swift.package.manager.enabled&quot;;
+        /**
+         * The properties key for the Central search URL.
+         */
+        public static final String ANALYZER_CENTRAL_URL = &quot;analyzer.central.url&quot;;
+        /**
+         * The path to mono, if available.
+         */
+        public static final String ANALYZER_ASSEMBLY_MONO_PATH = &quot;analyzer.assembly.mono.path&quot;;
+        /**
+         * The path to bundle-audit, if available.
+         */
+        public static final String ANALYZER_BUNDLE_AUDIT_PATH = &quot;analyzer.bundle.audit.path&quot;;
+        /**
+         * The additional configured zip file extensions, if available.
+         */
+        public static final String ADDITIONAL_ZIP_EXTENSIONS = &quot;extensions.zip&quot;;
+        /**
+         * The key to obtain the path to the VFEED data file.
+         */
+        public static final String VFEED_DATA_FILE = &quot;vfeed.data_file&quot;;
+        /**
+         * The key to obtain the VFEED connection string.
+         */
+        public static final String VFEED_CONNECTION_STRING = &quot;vfeed.connection_string&quot;;
+        /**
+         * The key to obtain the base download URL for the VFeed data file.
+         */
+        public static final String VFEED_DOWNLOAD_URL = &quot;vfeed.download_url&quot;;
+        /**
+         * The key to obtain the download file name for the VFeed data.
+         */
+        public static final String VFEED_DOWNLOAD_FILE = &quot;vfeed.download_file&quot;;
+        /**
+         * The key to obtain the VFeed update status.
+         */
+        public static final String VFEED_UPDATE_STATUS = &quot;vfeed.update_status&quot;;
+        /**
+         * The key to the HTTP request method for query last modified date.
+         */
+        public static final String DOWNLOADER_QUICK_QUERY_TIMESTAMP = &quot;downloader.quick.query.timestamp&quot;;
+        /**
+         * The key to HTTP protocol list to use.
+         */
+        public static final String DOWNLOADER_TLS_PROTOCOL_LIST = &quot;downloader.tls.protocols&quot;;
+        /**
+         * The key to determine if the CPE analyzer is enabled.
+         */
+        public static final String ANALYZER_CPE_ENABLED = &quot;analyzer.cpe.enabled&quot;;
+        /**
+         * The key to determine if the CPE Suppression analyzer is enabled.
+         */
+        public static final String ANALYZER_CPE_SUPPRESSION_ENABLED = &quot;analyzer.cpesuppression.enabled&quot;;
+        /**
+         * The key to determine if the Dependency Bundling analyzer is enabled.
+         */
+        public static final String ANALYZER_DEPENDENCY_BUNDLING_ENABLED = &quot;analyzer.dependencybundling.enabled&quot;;
+        /**
+         * The key to determine if the Dependency Merging analyzer is enabled.
+         */
+        public static final String ANALYZER_DEPENDENCY_MERGING_ENABLED = &quot;analyzer.dependencymerging.enabled&quot;;
+        /**
+         * The key to determine if the False Positive analyzer is enabled.
+         */
+        public static final String ANALYZER_FALSE_POSITIVE_ENABLED = &quot;analyzer.falsepositive.enabled&quot;;
+        /**
+         * The key to determine if the File Name analyzer is enabled.
+         */
+        public static final String ANALYZER_FILE_NAME_ENABLED = &quot;analyzer.filename.enabled&quot;;
+        /**
+         * The key to determine if the Hint analyzer is enabled.
+         */
+        public static final String ANALYZER_HINT_ENABLED = &quot;analyzer.hint.enabled&quot;;
+        /**
+         * The key to determine if the Version Filter analyzer is enabled.
+         */
+        public static final String ANALYZER_VERSION_FILTER_ENABLED = &quot;analyzer.versionfilter.enabled&quot;;
+        /**
+         * The key to determine if the NVD CVE analyzer is enabled.
+         */
+        public static final String ANALYZER_NVD_CVE_ENABLED = &quot;analyzer.nvdcve.enabled&quot;;
+        /**
+         * The key to determine if the Vulnerability Suppression analyzer is
+         * enabled.
+         */
+        public static final String ANALYZER_VULNERABILITY_SUPPRESSION_ENABLED = &quot;analyzer.vulnerabilitysuppression.enabled&quot;;
+        /**
+         * The key to determine if the NVD CVE updater should be enabled.
+         */
+        public static final String UPDATE_NVDCVE_ENABLED = &quot;updater.nvdcve.enabled&quot;;
+        /**
+         * The key to determine if dependency-check should check if there is a
+         * new version available.
+         */
+        public static final String UPDATE_VERSION_CHECK_ENABLED = &quot;updater.versioncheck.enabled&quot;;
+
+        /**
+         * private constructor because this is a &quot;utility&quot; class containing
+         * constants
+         */
+<span class="nc" id="L445">        private KEYS() {</span>
+            //do nothing
+<span class="nc" id="L447">        }</span>
+    }
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Private constructor for the Settings class. This class loads the
+     * properties files.
+     *
+     * @param propertiesFilePath the path to the base properties file to load
+     */
+<span class="fc" id="L457">    private Settings(String propertiesFilePath) {</span>
+<span class="fc" id="L458">        props = new Properties();</span>
+<span class="pc" id="L459">        try (InputStream in = FileUtils.getResourceAsStream(propertiesFilePath)) {</span>
+<span class="fc" id="L460">            props.load(in);</span>
+<span class="pc bpc" id="L461" title="6 of 8 branches missed.">        } catch (NullPointerException ex) {</span>
+<span class="nc" id="L462">            LOGGER.error(&quot;Did not find settings file '{}'.&quot;, propertiesFilePath);</span>
+<span class="nc" id="L463">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L464">        } catch (IOException ex) {</span>
+<span class="nc" id="L465">            LOGGER.error(&quot;Unable to load settings from '{}'.&quot;, propertiesFilePath);</span>
+<span class="nc" id="L466">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="pc" id="L467">        }</span>
+<span class="fc" id="L468">        logProperties(&quot;Properties loaded&quot;, props);</span>
+<span class="fc" id="L469">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Initializes the thread local settings object. Note, to use the settings
+     * object you must call this method. However, you must also call
+     * Settings.cleanup() to properly release resources.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * &lt;b&gt;Note&lt;/b&gt; - Only an end user interface such as the CLI, Maven Plugin,
+     * etc. should call initialize. When called `initialize` will over-write any
+     * configured settings (i.e. configured via the maven plugin) and the
+     * default values from dependency-check-core will be used. If you are
+     * running into issues with the settings not being initialized it is likely
+     * due to multi-threading and you should use the `Settings.setInstance`
+     * method instead. See the `TimestampRetriever` class within NvdCveUpdater
+     * as an example.&lt;/p&gt;
+     *
+     */
+    public static void initialize() {
+<span class="fc" id="L489">        LOCAL_SETTINGS.set(new Settings(PROPERTIES_FILE));</span>
+<span class="fc" id="L490">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Initializes the thread local settings object. Note, to use the settings
+     * object you must call this method. However, you must also call
+     * Settings.cleanup() to properly release resources.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * &lt;b&gt;Note&lt;/b&gt; - Only an end user interface such as the CLI, Maven Plugin,
+     * etc. should call initialize. When called `initialize` will over-write any
+     * configured settings (i.e. configured via the maven plugin) and the
+     * default values from dependency-check-core will be used. If you are
+     * running into issues with the settings not being initialized it is likely
+     * due to multi-threading and you should use the `Settings.setInstance`
+     * method instead. See the `TimestampRetriever` class within NvdCveUpdater
+     * as an example.&lt;/p&gt;
+     *
+     * @param propertiesFilePath the path to the base properties file to load
+     */
+    public static void initialize(String propertiesFilePath) {
+<span class="nc" id="L511">        LOCAL_SETTINGS.set(new Settings(propertiesFilePath));</span>
+<span class="nc" id="L512">    }</span>
+
+    /**
+     * Cleans up resources to prevent memory leaks.
+     *
+     */
+    public static void cleanup() {
+<span class="fc" id="L519">        cleanup(true);</span>
+<span class="fc" id="L520">    }</span>
+
+    /**
+     * Cleans up resources to prevent memory leaks.
+     *
+     * @param deleteTemporary flag indicating whether any temporary directories
+     * generated should be removed
+     */
+    public static synchronized void cleanup(boolean deleteTemporary) {
+<span class="pc bpc" id="L529" title="1 of 6 branches missed.">        if (deleteTemporary &amp;&amp; tempDirectory != null &amp;&amp; tempDirectory.exists()) {</span>
+<span class="fc" id="L530">            FileUtils.delete(tempDirectory);</span>
+<span class="fc" id="L531">            tempDirectory = null;</span>
+        }
+        try {
+<span class="fc" id="L534">            LOCAL_SETTINGS.remove();</span>
+<span class="nc" id="L535">        } catch (Throwable ex) {</span>
+<span class="nc" id="L536">            LOGGER.debug(&quot;Error cleaning up Settings&quot;, ex);</span>
+<span class="fc" id="L537">        }</span>
+<span class="fc" id="L538">    }</span>
+
+    /**
+     * Gets the underlying instance of the Settings object.
+     *
+     * @return the Settings object
+     */
+    public static Settings getInstance() {
+<span class="fc" id="L546">        return LOCAL_SETTINGS.get();</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Sets the instance of the Settings object to use in this thread.&lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;b&gt;Note&lt;/b&gt; - if using this method to enable multi-threading one must
+     * call `Settings.cleanup(false)`. See the `TimestampRetriever` class within
+     * NvdCveUpdater as an example.&lt;/p&gt;
+     *
+     * @param instance the instance of the settings object to use in this thread
+     */
+    public static void setInstance(Settings instance) {
+<span class="fc" id="L560">        LOCAL_SETTINGS.set(instance);</span>
+<span class="fc" id="L561">    }</span>
+
+    /**
+     * Logs the properties. This will not log any properties that contain
+     * 'password' in the key.
+     *
+     * @param header the header to print with the log message
+     * @param properties the properties to log
+     */
+    private static void logProperties(String header, Properties properties) {
+<span class="fc bfc" id="L571" title="All 2 branches covered.">        if (LOGGER.isDebugEnabled()) {</span>
+<span class="fc" id="L572">            final StringWriter sw = new StringWriter();</span>
+<span class="pc" id="L573">            try (PrintWriter pw = new PrintWriter(sw)) {</span>
+<span class="fc" id="L574">                pw.format(&quot;%s:%n%n&quot;, header);</span>
+<span class="fc" id="L575">                final Enumeration&lt;?&gt; e = properties.propertyNames();</span>
+<span class="fc bfc" id="L576" title="All 2 branches covered.">                while (e.hasMoreElements()) {</span>
+<span class="fc" id="L577">                    final String key = (String) e.nextElement();</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">                    if (key.contains(&quot;password&quot;)) {</span>
+<span class="fc" id="L579">                        pw.format(&quot;%s='*****'%n&quot;, key);</span>
+                    } else {
+<span class="fc" id="L581">                        final String value = properties.getProperty(key);</span>
+<span class="pc bpc" id="L582" title="1 of 2 branches missed.">                        if (value != null) {</span>
+<span class="fc" id="L583">                            pw.format(&quot;%s='%s'%n&quot;, key, value);</span>
+                        }
+                    }
+<span class="fc" id="L586">                }</span>
+<span class="fc" id="L587">                pw.flush();</span>
+<span class="fc" id="L588">                LOGGER.debug(sw.toString());</span>
+<span class="pc bpc" id="L589" title="6 of 8 branches missed.">            }</span>
+
+        }
+<span class="fc" id="L592">    }</span>
+
+    /**
+     * Sets a property value.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setString(String key, String value) {
+<span class="fc" id="L601">        LOCAL_SETTINGS.get().props.setProperty(key, value);</span>
+<span class="fc" id="L602">        LOGGER.debug(&quot;Setting: {}='{}'&quot;, key, value);</span>
+<span class="fc" id="L603">    }</span>
+
+    /**
+     * Sets a property value only if the value is not null.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setStringIfNotNull(String key, String value) {
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        if (null != value) {</span>
+<span class="nc" id="L613">            setString(key, value);</span>
+        }
+<span class="fc" id="L615">    }</span>
+
+    /**
+     * Sets a property value only if the value is not null and not empty.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setStringIfNotEmpty(String key, String value) {
+<span class="pc bpc" id="L624" title="1 of 4 branches missed.">        if (null != value &amp;&amp; !value.isEmpty()) {</span>
+<span class="nc" id="L625">            setString(key, value);</span>
+        }
+<span class="fc" id="L627">    }</span>
+
+    /**
+     * Sets a property value only if the array value is not null and not empty.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setArrayIfNotEmpty(String key, String[] value) {
+<span class="fc bfc" id="L636" title="All 4 branches covered.">        if (null != value &amp;&amp; value.length &gt; 0) {</span>
+<span class="fc" id="L637">            setString(key, StringUtils.join(value, ARRAY_SEP));</span>
+        }
+<span class="fc" id="L639">    }</span>
+
+    /**
+     * Sets a property value.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setBoolean(String key, boolean value) {
+<span class="fc" id="L648">        setString(key, Boolean.toString(value));</span>
+<span class="fc" id="L649">    }</span>
+
+    /**
+     * Sets a property value only if the value is not null.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setBooleanIfNotNull(String key, Boolean value) {
+<span class="fc bfc" id="L658" title="All 2 branches covered.">        if (null != value) {</span>
+<span class="fc" id="L659">            setBoolean(key, value);</span>
+        }
+<span class="fc" id="L661">    }</span>
+
+    /**
+     * Sets a property value.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setInt(String key, int value) {
+<span class="nc" id="L670">        LOCAL_SETTINGS.get().props.setProperty(key, String.valueOf(value));</span>
+<span class="nc" id="L671">        LOGGER.debug(&quot;Setting: {}='{}'&quot;, key, value);</span>
+<span class="nc" id="L672">    }</span>
+
+    /**
+     * Sets a property value only if the value is not null.
+     *
+     * @param key the key for the property
+     * @param value the value for the property
+     */
+    public static void setIntIfNotNull(String key, Integer value) {
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        if (null != value) {</span>
+<span class="nc" id="L682">            setInt(key, value);</span>
+        }
+<span class="fc" id="L684">    }</span>
+
+    /**
+     * Merges a new properties file into the current properties. This method
+     * allows for the loading of a user provided properties file.&lt;br&gt;&lt;br&gt;
+     * &lt;b&gt;Note&lt;/b&gt;: even if using this method - system properties will be loaded
+     * before properties loaded from files.
+     *
+     * @param filePath the path to the properties file to merge.
+     * @throws FileNotFoundException is thrown when the filePath points to a
+     * non-existent file
+     * @throws IOException is thrown when there is an exception loading/merging
+     * the properties
+     */
+    public static void mergeProperties(File filePath) throws FileNotFoundException, IOException {
+<span class="pc" id="L699">        try (FileInputStream fis = new FileInputStream(filePath)) {</span>
+<span class="fc" id="L700">            mergeProperties(fis);</span>
+<span class="pc bpc" id="L701" title="6 of 8 branches missed.">        }</span>
+<span class="fc" id="L702">    }</span>
+
+    /**
+     * Merges a new properties file into the current properties. This method
+     * allows for the loading of a user provided properties file.&lt;br&gt;&lt;br&gt;
+     * Note: even if using this method - system properties will be loaded before
+     * properties loaded from files.
+     *
+     * @param filePath the path to the properties file to merge.
+     * @throws FileNotFoundException is thrown when the filePath points to a
+     * non-existent file
+     * @throws IOException is thrown when there is an exception loading/merging
+     * the properties
+     */
+    public static void mergeProperties(String filePath) throws FileNotFoundException, IOException {
+<span class="pc" id="L717">        try (FileInputStream fis = new FileInputStream(filePath)) {</span>
+<span class="fc" id="L718">            mergeProperties(fis);</span>
+<span class="pc bpc" id="L719" title="6 of 8 branches missed.">        }</span>
+<span class="fc" id="L720">    }</span>
+
+    /**
+     * Merges a new properties file into the current properties. This method
+     * allows for the loading of a user provided properties file.&lt;br&gt;&lt;br&gt;
+     * &lt;b&gt;Note&lt;/b&gt;: even if using this method - system properties will be loaded
+     * before properties loaded from files.
+     *
+     * @param stream an Input Stream pointing at a properties file to merge
+     * @throws IOException is thrown when there is an exception loading/merging
+     * the properties
+     */
+    public static void mergeProperties(InputStream stream) throws IOException {
+<span class="fc" id="L733">        LOCAL_SETTINGS.get().props.load(stream);</span>
+<span class="fc" id="L734">        logProperties(&quot;Properties updated via merge&quot;, LOCAL_SETTINGS.get().props);</span>
+<span class="fc" id="L735">    }</span>
+
+    /**
+     * Returns a value from the properties file as a File object. If the value
+     * was specified as a system property or passed in via the -Dprop=value
+     * argument - this method will return the value from the system properties
+     * before the values in the contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file converted to a File object
+     */
+    public static File getFile(String key) {
+<span class="nc" id="L747">        final String file = getString(key);</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">        if (file == null) {</span>
+<span class="nc" id="L749">            return null;</span>
+        }
+<span class="nc" id="L751">        return new File(file);</span>
+    }
+
+    /**
+     * Returns a value from the properties file as a File object. If the value
+     * was specified as a system property or passed in via the -Dprop=value
+     * argument - this method will return the value from the system properties
+     * before the values in the contained configuration file.
+     *
+     * This method will check the configured base directory and will use this as
+     * the base of the file path. Additionally, if the base directory begins
+     * with a leading &quot;[JAR]\&quot; sequence with the path to the folder containing
+     * the JAR file containing this class.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file converted to a File object
+     */
+    protected static File getDataFile(String key) {
+<span class="fc" id="L769">        final String file = getString(key);</span>
+<span class="fc" id="L770">        LOGGER.debug(&quot;Settings.getDataFile() - file: '{}'&quot;, file);</span>
+<span class="pc bpc" id="L771" title="1 of 2 branches missed.">        if (file == null) {</span>
+<span class="nc" id="L772">            return null;</span>
+        }
+<span class="fc bfc" id="L774" title="All 2 branches covered.">        if (file.startsWith(&quot;[JAR]&quot;)) {</span>
+<span class="fc" id="L775">            LOGGER.debug(&quot;Settings.getDataFile() - transforming filename&quot;);</span>
+<span class="fc" id="L776">            final File jarPath = getJarPath();</span>
+<span class="fc" id="L777">            LOGGER.debug(&quot;Settings.getDataFile() - jar file: '{}'&quot;, jarPath.toString());</span>
+<span class="fc" id="L778">            final File retVal = new File(jarPath, file.substring(6));</span>
+<span class="fc" id="L779">            LOGGER.debug(&quot;Settings.getDataFile() - returning: '{}'&quot;, retVal.toString());</span>
+<span class="fc" id="L780">            return retVal;</span>
+        }
+<span class="fc" id="L782">        return new File(file);</span>
+    }
+
+    /**
+     * Attempts to retrieve the folder containing the Jar file containing the
+     * Settings class.
+     *
+     * @return a File object
+     */
+    private static File getJarPath() {
+<span class="fc" id="L792">        String decodedPath = &quot;.&quot;;</span>
+<span class="fc" id="L793">        String jarPath = &quot;&quot;;</span>
+<span class="fc" id="L794">        final ProtectionDomain domain = Settings.class.getProtectionDomain();</span>
+<span class="pc bpc" id="L795" title="3 of 6 branches missed.">        if (domain != null &amp;&amp; domain.getCodeSource() != null &amp;&amp; domain.getCodeSource().getLocation() != null) {</span>
+<span class="fc" id="L796">            jarPath = Settings.class.getProtectionDomain().getCodeSource().getLocation().getPath();</span>
+        }
+        try {
+<span class="fc" id="L799">            decodedPath = URLDecoder.decode(jarPath, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L800">        } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L801">            LOGGER.trace(&quot;&quot;, ex);</span>
+<span class="fc" id="L802">        }</span>
+
+<span class="fc" id="L804">        final File path = new File(decodedPath);</span>
+<span class="pc bpc" id="L805" title="1 of 2 branches missed.">        if (path.getName().toLowerCase().endsWith(&quot;.jar&quot;)) {</span>
+<span class="fc" id="L806">            return path.getParentFile();</span>
+        } else {
+<span class="nc" id="L808">            return new File(&quot;.&quot;);</span>
+        }
+    }
+
+    /**
+     * Returns a value from the properties file. If the value was specified as a
+     * system property or passed in via the -Dprop=value argument - this method
+     * will return the value from the system properties before the values in the
+     * contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @param defaultValue the default value for the requested property
+     * @return the property from the properties file
+     */
+    public static String getString(String key, String defaultValue) {
+<span class="fc" id="L823">        return System.getProperty(key, LOCAL_SETTINGS.get().props.getProperty(key, defaultValue));</span>
+    }
+
+    /**
+     * Returns the temporary directory.
+     *
+     * @return the temporary directory
+     * @throws java.io.IOException thrown if the temporary directory does not
+     * exist and cannot be created
+     */
+    public static synchronized File getTempDirectory() throws IOException {
+<span class="fc bfc" id="L834" title="All 2 branches covered.">        if (tempDirectory == null) {</span>
+<span class="fc" id="L835">            final File baseTemp = new File(Settings.getString(Settings.KEYS.TEMP_DIRECTORY, System.getProperty(&quot;java.io.tmpdir&quot;)));</span>
+<span class="fc" id="L836">            tempDirectory = FileUtils.createTempDirectory(baseTemp);</span>
+        }
+<span class="fc" id="L838">        return tempDirectory;</span>
+    }
+
+    /**
+     * Returns a value from the properties file. If the value was specified as a
+     * system property or passed in via the -Dprop=value argument - this method
+     * will return the value from the system properties before the values in the
+     * contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file
+     */
+    public static String getString(String key) {
+<span class="fc" id="L851">        return System.getProperty(key, LOCAL_SETTINGS.get().props.getProperty(key));</span>
+    }
+
+    /**
+     * Returns a list with the given key.
+     *
+     * If the propery is not set then {@code null} will be returned.
+     *
+     * @param key the key to get from this {@link Settings} singleton.
+     * @return the list or {@code null} if the key wasn't present.
+     */
+    public static String[] getArray(final String key) {
+<span class="fc" id="L863">        final String string = getString(key);</span>
+<span class="fc bfc" id="L864" title="All 2 branches covered.">        if (string != null) {</span>
+<span class="fc" id="L865">            return string.split(ARRAY_SEP);</span>
+        }
+<span class="fc" id="L867">        return null;</span>
+    }
+
+    /**
+     * Removes a property from the local properties collection. This is mainly
+     * used in test cases.
+     *
+     * @param key the property key to remove
+     */
+    public static void removeProperty(String key) {
+<span class="fc" id="L877">        LOCAL_SETTINGS.get().props.remove(key);</span>
+<span class="fc" id="L878">    }</span>
+
+    /**
+     * Returns an int value from the properties file. If the value was specified
+     * as a system property or passed in via the -Dprop=value argument - this
+     * method will return the value from the system properties before the values
+     * in the contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file
+     * @throws InvalidSettingException is thrown if there is an error retrieving
+     * the setting
+     */
+    public static int getInt(String key) throws InvalidSettingException {
+        try {
+<span class="fc" id="L893">            return Integer.parseInt(Settings.getString(key));</span>
+<span class="nc" id="L894">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L895">            throw new InvalidSettingException(&quot;Could not convert property '&quot; + key + &quot;' to an int.&quot;, ex);</span>
+        }
+    }
+
+    /**
+     * Returns an int value from the properties file. If the value was specified
+     * as a system property or passed in via the -Dprop=value argument - this
+     * method will return the value from the system properties before the values
+     * in the contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @param defaultValue the default value to return
+     * @return the property from the properties file or the defaultValue if the
+     * property does not exist or cannot be converted to an integer
+     */
+    public static int getInt(String key, int defaultValue) {
+        int value;
+        try {
+<span class="fc" id="L913">            value = Integer.parseInt(Settings.getString(key));</span>
+<span class="fc" id="L914">        } catch (NumberFormatException ex) {</span>
+<span class="fc bfc" id="L915" title="All 2 branches covered.">            if (!Settings.getString(key, &quot;&quot;).isEmpty()) {</span>
+<span class="fc" id="L916">                LOGGER.debug(&quot;Could not convert property '{}={}' to an int; using {} instead.&quot;, key, Settings.getString(key), defaultValue);</span>
+            }
+<span class="fc" id="L918">            value = defaultValue;</span>
+<span class="fc" id="L919">        }</span>
+<span class="fc" id="L920">        return value;</span>
+    }
+
+    /**
+     * Returns a long value from the properties file. If the value was specified
+     * as a system property or passed in via the -Dprop=value argument - this
+     * method will return the value from the system properties before the values
+     * in the contained configuration file.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file
+     * @throws InvalidSettingException is thrown if there is an error retrieving
+     * the setting
+     */
+    public static long getLong(String key) throws InvalidSettingException {
+        try {
+<span class="fc" id="L936">            return Long.parseLong(Settings.getString(key));</span>
+<span class="nc" id="L937">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L938">            throw new InvalidSettingException(&quot;Could not convert property '&quot; + key + &quot;' to a long.&quot;, ex);</span>
+        }
+    }
+
+    /**
+     * Returns a boolean value from the properties file. If the value was
+     * specified as a system property or passed in via the
+     * &lt;code&gt;-Dprop=value&lt;/code&gt; argument this method will return the value from
+     * the system properties before the values in the contained configuration
+     * file.
+     *
+     * @param key the key to lookup within the properties file
+     * @return the property from the properties file
+     * @throws InvalidSettingException is thrown if there is an error retrieving
+     * the setting
+     */
+    public static boolean getBoolean(String key) throws InvalidSettingException {
+<span class="fc" id="L955">        return Boolean.parseBoolean(Settings.getString(key));</span>
+    }
+
+    /**
+     * Returns a boolean value from the properties file. If the value was
+     * specified as a system property or passed in via the
+     * &lt;code&gt;-Dprop=value&lt;/code&gt; argument this method will return the value from
+     * the system properties before the values in the contained configuration
+     * file.
+     *
+     * @param key the key to lookup within the properties file
+     * @param defaultValue the default value to return if the setting does not
+     * exist
+     * @return the property from the properties file
+     * @throws InvalidSettingException is thrown if there is an error retrieving
+     * the setting
+     */
+    public static boolean getBoolean(String key, boolean defaultValue) throws InvalidSettingException {
+<span class="fc" id="L973">        return Boolean.parseBoolean(Settings.getString(key, Boolean.toString(defaultValue)));</span>
+    }
+
+    /**
+     * Returns a connection string from the configured properties. If the
+     * connection string contains a %s, this method will determine the 'data'
+     * directory and replace the %s with the path to the data directory. If the
+     * data directory does not exists it will be created.
+     *
+     * @param connectionStringKey the property file key for the connection
+     * string
+     * @param dbFileNameKey the settings key for the db filename
+     * @return the connection string
+     * @throws IOException thrown the data directory cannot be created
+     * @throws InvalidSettingException thrown if there is an invalid setting
+     */
+    public static String getConnectionString(String connectionStringKey, String dbFileNameKey)
+            throws IOException, InvalidSettingException {
+<span class="fc" id="L991">        final String connStr = Settings.getString(connectionStringKey);</span>
+<span class="fc bfc" id="L992" title="All 2 branches covered.">        if (connStr == null) {</span>
+<span class="fc" id="L993">            final String msg = String.format(&quot;Invalid properties file; %s is missing.&quot;, connectionStringKey);</span>
+<span class="fc" id="L994">            throw new InvalidSettingException(msg);</span>
+        }
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">        if (connStr.contains(&quot;%s&quot;)) {</span>
+<span class="fc" id="L997">            final File directory = getDataDirectory();</span>
+<span class="fc" id="L998">            String fileName = null;</span>
+<span class="pc bpc" id="L999" title="1 of 2 branches missed.">            if (dbFileNameKey != null) {</span>
+<span class="fc" id="L1000">                fileName = Settings.getString(dbFileNameKey);</span>
+            }
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">            if (fileName == null) {</span>
+<span class="nc" id="L1003">                final String msg = String.format(&quot;Invalid properties file to get a file based connection string; '%s' must be defined.&quot;,</span>
+                        dbFileNameKey);
+<span class="nc" id="L1005">                throw new InvalidSettingException(msg);</span>
+            }
+<span class="pc bpc" id="L1007" title="2 of 4 branches missed.">            if (connStr.startsWith(&quot;jdbc:h2:file:&quot;) &amp;&amp; fileName.endsWith(&quot;.h2.db&quot;)) {</span>
+<span class="fc" id="L1008">                fileName = fileName.substring(0, fileName.length() - 6);</span>
+            }
+            // yes, for H2 this path won't actually exists - but this is sufficient to get the value needed
+<span class="fc" id="L1011">            final File dbFile = new File(directory, fileName);</span>
+<span class="fc" id="L1012">            final String cString = String.format(connStr, dbFile.getCanonicalPath());</span>
+<span class="fc" id="L1013">            LOGGER.debug(&quot;Connection String: '{}'&quot;, cString);</span>
+<span class="fc" id="L1014">            return cString;</span>
+        }
+<span class="nc" id="L1016">        return connStr;</span>
+    }
+
+    /**
+     * Retrieves the directory that the JAR file exists in so that we can ensure
+     * we always use a common data directory for the embedded H2 database. This
+     * is public solely for some unit tests; otherwise this should be private.
+     *
+     * @return the data directory to store data files
+     * @throws IOException is thrown if an IOException occurs of course...
+     */
+    public static File getDataDirectory() throws IOException {
+<span class="fc" id="L1028">        final File path = Settings.getDataFile(Settings.KEYS.DATA_DIRECTORY);</span>
+<span class="pc bpc" id="L1029" title="2 of 6 branches missed.">        if (path != null &amp;&amp; (path.exists() || path.mkdirs())) {</span>
+<span class="fc" id="L1030">            return path;</span>
+        }
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">        throw new IOException(String.format(&quot;Unable to create the data directory '%s'&quot;,</span>
+                (path == null) ? &quot;unknown&quot; : path.getAbsolutePath()));
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NexusSearch.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.nexus</a> &gt; <span class="el_source">NexusSearch.java</span></div><h1>NexusSearch.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2014 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.nexus;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
+
+import org.owasp.dependencycheck.utils.URLConnectionFactory;
+import org.owasp.dependencycheck.utils.XmlUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
+
+/**
+ * Class of methods to search Nexus repositories.
+ *
+ * @author colezlaw
+ */
+public class NexusSearch {
+
+    /**
+     * The root URL for the Nexus repository service.
+     */
+    private final URL rootURL;
+
+    /**
+     * Whether to use the Proxy when making requests.
+     */
+    private final boolean useProxy;
+    /**
+     * Used for logging.
+     */
+<span class="nc" id="L56">    private static final Logger LOGGER = LoggerFactory.getLogger(NexusSearch.class);</span>
+
+    /**
+     * Creates a NexusSearch for the given repository URL.
+     *
+     * @param rootURL the root URL of the repository on which searches should
+     * execute. full URL's are calculated relative to this URL, so it should end
+     * with a /
+     * @param useProxy flag indicating if the proxy settings should be used
+     */
+<span class="nc" id="L66">    public NexusSearch(URL rootURL, boolean useProxy) {</span>
+<span class="nc" id="L67">        this.rootURL = rootURL;</span>
+<span class="nc" id="L68">        this.useProxy = useProxy;</span>
+<span class="nc" id="L69">        LOGGER.debug(&quot;Using proxy: {}&quot;, useProxy);</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Searches the configured Nexus repository for the given sha1 hash. If the
+     * artifact is found, a &lt;code&gt;MavenArtifact&lt;/code&gt; is populated with the
+     * coordinate information.
+     *
+     * @param sha1 The SHA-1 hash string for which to search
+     * @return the populated Maven coordinates
+     * @throws IOException if it's unable to connect to the specified repository
+     * or if the specified artifact is not found.
+     */
+    public MavenArtifact searchSha1(String sha1) throws IOException {
+<span class="nc bnc" id="L83" title="All 4 branches missed.">        if (null == sha1 || !sha1.matches(&quot;^[0-9A-Fa-f]{40}$&quot;)) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(&quot;Invalid SHA1 format&quot;);</span>
+        }
+
+<span class="nc" id="L87">        final URL url = new URL(rootURL, String.format(&quot;identify/sha1/%s&quot;,</span>
+                sha1.toLowerCase()));
+
+<span class="nc" id="L90">        LOGGER.debug(&quot;Searching Nexus url {}&quot;, url);</span>
+
+        // Determine if we need to use a proxy. The rules:
+        // 1) If the proxy is set, AND the setting is set to true, use the proxy
+        // 2) Otherwise, don't use the proxy (either the proxy isn't configured,
+        // or proxy is specifically set to false
+        HttpURLConnection conn;
+<span class="nc" id="L97">        conn = URLConnectionFactory.createHttpURLConnection(url, useProxy);</span>
+<span class="nc" id="L98">        conn.setDoOutput(true);</span>
+
+        // JSON would be more elegant, but there's not currently a dependency
+        // on JSON, so don't want to add one just for this
+<span class="nc" id="L102">        conn.addRequestProperty(&quot;Accept&quot;, &quot;application/xml&quot;);</span>
+<span class="nc" id="L103">        conn.connect();</span>
+
+<span class="nc bnc" id="L105" title="All 3 branches missed.">        switch (conn.getResponseCode()) {</span>
+            case 200:
+                try {
+<span class="nc" id="L108">                    final DocumentBuilder builder = XmlUtils.buildSecureDocumentBuilder();</span>
+<span class="nc" id="L109">                    final Document doc = builder.parse(conn.getInputStream());</span>
+<span class="nc" id="L110">                    final XPath xpath = XPathFactory.newInstance().newXPath();</span>
+<span class="nc" id="L111">                    final String groupId = xpath</span>
+                            .evaluate(
+                                    &quot;/org.sonatype.nexus.rest.model.NexusArtifact/groupId&quot;,
+                                    doc);
+<span class="nc" id="L115">                    final String artifactId = xpath.evaluate(</span>
+                            &quot;/org.sonatype.nexus.rest.model.NexusArtifact/artifactId&quot;,
+                            doc);
+<span class="nc" id="L118">                    final String version = xpath</span>
+                            .evaluate(
+                                    &quot;/org.sonatype.nexus.rest.model.NexusArtifact/version&quot;,
+                                    doc);
+<span class="nc" id="L122">                    final String link = xpath</span>
+                            .evaluate(
+                                    &quot;/org.sonatype.nexus.rest.model.NexusArtifact/artifactLink&quot;,
+                                    doc);
+<span class="nc" id="L126">                    final String pomLink = xpath</span>
+                            .evaluate(
+                                    &quot;/org.sonatype.nexus.rest.model.NexusArtifact/pomLink&quot;,
+                                    doc);
+<span class="nc" id="L130">                    final MavenArtifact ma = new MavenArtifact(groupId, artifactId, version);</span>
+<span class="nc bnc" id="L131" title="All 4 branches missed.">                    if (link != null &amp;&amp; !link.isEmpty()) {</span>
+<span class="nc" id="L132">                        ma.setArtifactUrl(link);</span>
+                    }
+<span class="nc bnc" id="L134" title="All 4 branches missed.">                    if (pomLink != null &amp;&amp; !pomLink.isEmpty()) {</span>
+<span class="nc" id="L135">                        ma.setPomUrl(pomLink);</span>
+                    }
+<span class="nc" id="L137">                    return ma;</span>
+<span class="nc" id="L138">                } catch (ParserConfigurationException | IOException | SAXException | XPathExpressionException e) {</span>
+                    // Anything else is jacked-up XML stuff that we really can't recover
+                    // from well
+<span class="nc" id="L141">                    throw new IOException(e.getMessage(), e);</span>
+                }
+            case 404:
+<span class="nc" id="L144">                throw new FileNotFoundException(&quot;Artifact not found in Nexus&quot;);</span>
+            default:
+<span class="nc" id="L146">                LOGGER.debug(&quot;Could not connect to Nexus received response code: {} {}&quot;,</span>
+                        conn.getResponseCode(), conn.getResponseMessage());
+<span class="nc" id="L148">                throw new IOException(&quot;Could not connect to Nexus&quot;);</span>
+        }
+    }
+
+    /**
+     * Do a preflight request to see if the repository is actually working.
+     *
+     * @return whether the repository is listening and returns the /status URL
+     * correctly
+     */
+    public boolean preflightRequest() {
+        HttpURLConnection conn;
+        try {
+<span class="nc" id="L161">            final URL url = new URL(rootURL, &quot;status&quot;);</span>
+<span class="nc" id="L162">            conn = URLConnectionFactory.createHttpURLConnection(url, useProxy);</span>
+<span class="nc" id="L163">            conn.addRequestProperty(&quot;Accept&quot;, &quot;application/xml&quot;);</span>
+<span class="nc" id="L164">            conn.connect();</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (conn.getResponseCode() != 200) {</span>
+<span class="nc" id="L166">                LOGGER.warn(&quot;Expected 200 result from Nexus, got {}&quot;, conn.getResponseCode());</span>
+<span class="nc" id="L167">                return false;</span>
+            }
+<span class="nc" id="L169">            final DocumentBuilder builder = XmlUtils.buildSecureDocumentBuilder();</span>
+
+<span class="nc" id="L171">            final Document doc = builder.parse(conn.getInputStream());</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (!&quot;status&quot;.equals(doc.getDocumentElement().getNodeName())) {</span>
+<span class="nc" id="L173">                LOGGER.warn(&quot;Expected root node name of status, got {}&quot;, doc.getDocumentElement().getNodeName());</span>
+<span class="nc" id="L174">                return false;</span>
+            }
+<span class="nc" id="L176">        } catch (IOException | ParserConfigurationException | SAXException e) {</span>
+<span class="nc" id="L177">            return false;</span>
+<span class="nc" id="L178">        }</span>
+
+<span class="nc" id="L180">        return true;</span>
+    }
+}
+
+// vim: cc=120:sw=4:ts=4:sts=4
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

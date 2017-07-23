@@ -1,0 +1,533 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SuppressionRule.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Maven Plugin</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.xml.suppression</a> &gt; <span class="el_source">SuppressionRule.java</span></div><h1>SuppressionRule.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.xml.suppression;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.Identifier;
+import org.owasp.dependencycheck.dependency.Vulnerability;
+
+/**
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L31">public class SuppressionRule {</span>
+
+    /**
+     * The file path for the suppression.
+     */
+    private PropertyType filePath;
+
+    /**
+     * The SHA1 hash.
+     */
+    private String sha1;
+    /**
+     * A list of CPEs to suppression
+     */
+<span class="fc" id="L45">    private List&lt;PropertyType&gt; cpe = new ArrayList&lt;&gt;();</span>
+    /**
+     * The list of cvssBelow scores.
+     */
+<span class="fc" id="L49">    private List&lt;Float&gt; cvssBelow = new ArrayList&lt;&gt;();</span>
+    /**
+     * The list of CWE entries to suppress.
+     */
+<span class="fc" id="L53">    private List&lt;String&gt; cwe = new ArrayList&lt;&gt;();</span>
+    /**
+     * The list of CVE entries to suppress.
+     */
+<span class="fc" id="L57">    private List&lt;String&gt; cve = new ArrayList&lt;&gt;();</span>
+    /**
+     * A Maven GAV to suppression.
+     */
+<span class="fc" id="L61">    private PropertyType gav = null;</span>
+    /**
+     * The notes added in suppression file
+     */
+
+    private String notes;
+
+    /**
+     * A flag indicating whether or not the suppression rule is a core/base rule
+     * that should not be included in the resulting report in the &quot;suppressed&quot;
+     * section.
+     */
+    private boolean base;
+
+    /**
+     * Get the value of filePath.
+     *
+     * @return the value of filePath
+     */
+    public PropertyType getFilePath() {
+<span class="fc" id="L81">        return filePath;</span>
+    }
+
+    /**
+     * Set the value of filePath.
+     *
+     * @param filePath new value of filePath
+     */
+    public void setFilePath(PropertyType filePath) {
+<span class="fc" id="L90">        this.filePath = filePath;</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Get the value of sha1.
+     *
+     * @return the value of sha1
+     */
+    public String getSha1() {
+<span class="fc" id="L99">        return sha1;</span>
+    }
+
+    /**
+     * Set the value of SHA1.
+     *
+     * @param sha1 new value of SHA1
+     */
+    public void setSha1(String sha1) {
+<span class="fc" id="L108">        this.sha1 = sha1;</span>
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * Get the value of CPE.
+     *
+     * @return the value of CPE
+     */
+    public List&lt;PropertyType&gt; getCpe() {
+<span class="fc" id="L117">        return cpe;</span>
+    }
+
+    /**
+     * Set the value of CPE.
+     *
+     * @param cpe new value of CPE
+     */
+    public void setCpe(List&lt;PropertyType&gt; cpe) {
+<span class="fc" id="L126">        this.cpe = cpe;</span>
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * Adds the CPE to the CPE list.
+     *
+     * @param cpe the CPE to add
+     */
+    public void addCpe(PropertyType cpe) {
+<span class="fc" id="L135">        this.cpe.add(cpe);</span>
+<span class="fc" id="L136">    }</span>
+
+    /**
+     * Returns whether or not this suppression rule as CPE entries.
+     *
+     * @return whether or not this suppression rule as CPE entries
+     */
+    public boolean hasCpe() {
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        return !cpe.isEmpty();</span>
+    }
+
+    /**
+     * Get the value of cvssBelow.
+     *
+     * @return the value of cvssBelow
+     */
+    public List&lt;Float&gt; getCvssBelow() {
+<span class="fc" id="L153">        return cvssBelow;</span>
+    }
+
+    /**
+     * Set the value of cvssBelow.
+     *
+     * @param cvssBelow new value of cvssBelow
+     */
+    public void setCvssBelow(List&lt;Float&gt; cvssBelow) {
+<span class="fc" id="L162">        this.cvssBelow = cvssBelow;</span>
+<span class="fc" id="L163">    }</span>
+
+    /**
+     * Adds the CVSS to the cvssBelow list.
+     *
+     * @param cvss the CVSS to add
+     */
+    public void addCvssBelow(Float cvss) {
+<span class="fc" id="L171">        this.cvssBelow.add(cvss);</span>
+<span class="fc" id="L172">    }</span>
+
+    /**
+     * Returns whether or not this suppression rule has CVSS suppressions.
+     *
+     * @return whether or not this suppression rule has CVSS suppressions
+     */
+    public boolean hasCvssBelow() {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        return !cvssBelow.isEmpty();</span>
+    }
+
+    /**
+     * Get the value of notes.
+     *
+     * @return the value of notes
+     */
+    public String getNotes() {
+<span class="nc" id="L189">        return notes;</span>
+    }
+
+    /**
+     * Set the value of notes.
+     *
+     * @param notes new value of cve
+     */
+    public void setNotes(String notes) {
+<span class="nc" id="L198">        this.notes = notes;</span>
+<span class="nc" id="L199">    }</span>
+
+    /**
+     * Adds the notes to the cve list.
+     *
+     * @param notes the cve to add
+     */
+    public void addNotes(String notes) {
+<span class="fc" id="L207">        this.notes = notes;</span>
+<span class="fc" id="L208">    }</span>
+
+    /**
+     * Returns whether this suppression rule has notes entries.
+     *
+     * @return whether this suppression rule has notes entries
+     */
+    public boolean hasNotes() {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        return !cve.isEmpty();</span>
+    }
+
+    /**
+     * Get the value of CWE.
+     *
+     * @return the value of CWE
+     */
+    public List&lt;String&gt; getCwe() {
+<span class="fc" id="L225">        return cwe;</span>
+    }
+
+    /**
+     * Set the value of CWE.
+     *
+     * @param cwe new value of CWE
+     */
+    public void setCwe(List&lt;String&gt; cwe) {
+<span class="fc" id="L234">        this.cwe = cwe;</span>
+<span class="fc" id="L235">    }</span>
+
+    /**
+     * Adds the CWE to the CWE list.
+     *
+     * @param cwe the CWE to add
+     */
+    public void addCwe(String cwe) {
+<span class="fc" id="L243">        this.cwe.add(cwe);</span>
+<span class="fc" id="L244">    }</span>
+
+    /**
+     * Returns whether this suppression rule has CWE entries.
+     *
+     * @return whether this suppression rule has CWE entries
+     */
+    public boolean hasCwe() {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        return !cwe.isEmpty();</span>
+    }
+
+    /**
+     * Get the value of CVE.
+     *
+     * @return the value of CVE
+     */
+    public List&lt;String&gt; getCve() {
+<span class="fc" id="L261">        return cve;</span>
+    }
+
+    /**
+     * Set the value of CVE.
+     *
+     * @param cve new value of CVE
+     */
+    public void setCve(List&lt;String&gt; cve) {
+<span class="fc" id="L270">        this.cve = cve;</span>
+<span class="fc" id="L271">    }</span>
+
+    /**
+     * Adds the CVE to the CVE list.
+     *
+     * @param cve the CVE to add
+     */
+    public void addCve(String cve) {
+<span class="fc" id="L279">        this.cve.add(cve);</span>
+<span class="fc" id="L280">    }</span>
+
+    /**
+     * Returns whether this suppression rule has CVE entries.
+     *
+     * @return whether this suppression rule has CVE entries
+     */
+    public boolean hasCve() {
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        return !cve.isEmpty();</span>
+    }
+
+    /**
+     * Get the value of Maven GAV.
+     *
+     * @return the value of GAV
+     */
+    public PropertyType getGav() {
+<span class="nc" id="L297">        return gav;</span>
+    }
+
+    /**
+     * Set the value of Maven GAV.
+     *
+     * @param gav new value of Maven GAV
+     */
+    public void setGav(PropertyType gav) {
+<span class="fc" id="L306">        this.gav = gav;</span>
+<span class="fc" id="L307">    }</span>
+
+    /**
+     * Returns whether or not this suppression rule as GAV entries.
+     *
+     * @return whether or not this suppression rule as GAV entries
+     */
+    public boolean hasGav() {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        return gav != null;</span>
+    }
+
+    /**
+     * Get the value of base.
+     *
+     * @return the value of base
+     */
+    public boolean isBase() {
+<span class="fc" id="L324">        return base;</span>
+    }
+
+    /**
+     * Set the value of base.
+     *
+     * @param base new value of base
+     */
+    public void setBase(boolean base) {
+<span class="fc" id="L333">        this.base = base;</span>
+<span class="fc" id="L334">    }</span>
+
+    /**
+     * Processes a given dependency to determine if any CPE, CVE, CWE, or CVSS
+     * scores should be suppressed. If any should be, they are removed from the
+     * dependency.
+     *
+     * @param dependency a project dependency to analyze
+     */
+    public void process(Dependency dependency) {
+<span class="fc bfc" id="L344" title="All 4 branches covered.">        if (filePath != null &amp;&amp; !filePath.matches(dependency.getFilePath())) {</span>
+<span class="fc" id="L345">            return;</span>
+        }
+<span class="fc bfc" id="L347" title="All 4 branches covered.">        if (sha1 != null &amp;&amp; !sha1.equalsIgnoreCase(dependency.getSha1sum())) {</span>
+<span class="fc" id="L348">            return;</span>
+        }
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        if (gav != null) {</span>
+<span class="fc" id="L351">            final Iterator&lt;Identifier&gt; itr = dependency.getIdentifiers().iterator();</span>
+<span class="fc" id="L352">            boolean gavFound = false;</span>
+<span class="fc bfc" id="L353" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L354">                final Identifier i = itr.next();</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">                if (identifierMatches(&quot;maven&quot;, this.gav, i)) {</span>
+<span class="fc" id="L356">                    gavFound = true;</span>
+<span class="fc" id="L357">                    break;</span>
+                }
+<span class="fc" id="L359">            }</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">            if (!gavFound) {</span>
+<span class="fc" id="L361">                return;</span>
+            }
+        }
+
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        if (this.hasCpe()) {</span>
+<span class="fc" id="L366">            final Iterator&lt;Identifier&gt; itr = dependency.getIdentifiers().iterator();</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L368">                final Identifier i = itr.next();</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">                for (PropertyType c : this.cpe) {</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                    if (identifierMatches(&quot;cpe&quot;, c, i)) {</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                        if (!isBase()) {</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                            if (this.notes != null) {</span>
+<span class="fc" id="L373">                                i.setNotes(this.notes);</span>
+                            }
+<span class="fc" id="L375">                            dependency.addSuppressedIdentifier(i);</span>
+                        }
+<span class="fc" id="L377">                        itr.remove();</span>
+<span class="fc" id="L378">                        break;</span>
+                    }
+<span class="fc" id="L380">                }</span>
+<span class="fc" id="L381">            }</span>
+        }
+<span class="fc bfc" id="L383" title="All 6 branches covered.">        if (hasCve() || hasCwe() || hasCvssBelow()) {</span>
+<span class="fc" id="L384">            final Iterator&lt;Vulnerability&gt; itr = dependency.getVulnerabilities().iterator();</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L386">                boolean remove = false;</span>
+<span class="fc" id="L387">                final Vulnerability v = itr.next();</span>
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                for (String entry : this.cve) {</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                    if (entry.equalsIgnoreCase(v.getName())) {</span>
+<span class="fc" id="L390">                        remove = true;</span>
+<span class="fc" id="L391">                        break;</span>
+                    }
+<span class="fc" id="L393">                }</span>
+<span class="fc bfc" id="L394" title="All 2 branches covered.">                if (!remove) {</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">                    for (String entry : this.cwe) {</span>
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">                        if (v.getCwe() != null) {</span>
+<span class="fc" id="L397">                            final String toMatch = String.format(&quot;CWE-%s &quot;, entry);</span>
+<span class="fc" id="L398">                            final String toTest = v.getCwe().substring(0, toMatch.length()).toUpperCase();</span>
+<span class="pc bpc" id="L399" title="1 of 2 branches missed.">                            if (toTest.equals(toMatch)) {</span>
+<span class="fc" id="L400">                                remove = true;</span>
+<span class="fc" id="L401">                                break;</span>
+                            }
+                        }
+<span class="nc" id="L404">                    }</span>
+                }
+<span class="fc bfc" id="L406" title="All 2 branches covered.">                if (!remove) {</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">                    for (float cvss : this.cvssBelow) {</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                        if (v.getCvssScore() &lt; cvss) {</span>
+<span class="fc" id="L409">                            remove = true;</span>
+<span class="fc" id="L410">                            break;</span>
+                        }
+<span class="fc" id="L412">                    }</span>
+                }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                if (remove) {</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                    if (!isBase()) {</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">                        if (this.notes != null) {</span>
+<span class="fc" id="L417">                            v.setNotes(this.notes);</span>
+                        }
+<span class="fc" id="L419">                        dependency.addSuppressedVulnerability(v);</span>
+                    }
+<span class="fc" id="L421">                    itr.remove();</span>
+                }
+<span class="fc" id="L423">            }</span>
+        }
+<span class="fc" id="L425">    }</span>
+
+    /**
+     * Identifies if the cpe specified by the cpe suppression rule does not
+     * specify a version.
+     *
+     * @param c a suppression rule identifier
+     * @return true if the property type does not specify a version; otherwise
+     * false
+     */
+    protected boolean cpeHasNoVersion(PropertyType c) {
+<span class="fc bfc" id="L436" title="All 4 branches covered.">        return !c.isRegex() &amp;&amp; countCharacter(c.getValue(), ':') &lt;= 3;</span>
+    }
+
+    /**
+     * Counts the number of occurrences of the character found within the
+     * string.
+     *
+     * @param str the string to check
+     * @param c the character to count
+     * @return the number of times the character is found in the string
+     */
+    private int countCharacter(String str, char c) {
+<span class="fc" id="L448">        int count = 0;</span>
+<span class="fc" id="L449">        int pos = str.indexOf(c) + 1;</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        while (pos &gt; 0) {</span>
+<span class="fc" id="L451">            count += 1;</span>
+<span class="fc" id="L452">            pos = str.indexOf(c, pos) + 1;</span>
+        }
+<span class="fc" id="L454">        return count;</span>
+    }
+
+    /**
+     * Determines if the cpeEntry specified as a PropertyType matches the given
+     * Identifier.
+     *
+     * @param identifierType the type of identifier (&quot;cpe&quot;, &quot;maven&quot;, etc.)
+     * @param suppressionEntry a suppression rule entry
+     * @param identifier a CPE identifier to check
+     * @return true if the entry matches; otherwise false
+     */
+    protected boolean identifierMatches(String identifierType, PropertyType suppressionEntry, Identifier identifier) {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        if (identifierType.equals(identifier.getType())) {</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            if (suppressionEntry.matches(identifier.getValue())) {</span>
+<span class="fc" id="L469">                return true;</span>
+<span class="fc bfc" id="L470" title="All 4 branches covered.">            } else if (&quot;cpe&quot;.equals(identifierType) &amp;&amp; cpeHasNoVersion(suppressionEntry)) {</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">                if (suppressionEntry.isCaseSensitive()) {</span>
+<span class="nc" id="L472">                    return identifier.getValue().startsWith(suppressionEntry.getValue());</span>
+                } else {
+<span class="fc" id="L474">                    final String id = identifier.getValue().toLowerCase();</span>
+<span class="fc" id="L475">                    final String check = suppressionEntry.getValue().toLowerCase();</span>
+<span class="fc" id="L476">                    return id.startsWith(check);</span>
+                }
+            }
+        }
+<span class="fc" id="L480">        return false;</span>
+    }
+
+    /**
+     * Standard toString implementation.
+     *
+     * @return a string representation of this object
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L490">        final StringBuilder sb = new StringBuilder(64);</span>
+<span class="nc" id="L491">        sb.append(&quot;SuppressionRule{&quot;);</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (filePath != null) {</span>
+<span class="nc" id="L493">            sb.append(&quot;filePath=&quot;).append(filePath).append(',');</span>
+        }
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        if (sha1 != null) {</span>
+<span class="nc" id="L496">            sb.append(&quot;sha1=&quot;).append(sha1).append(',');</span>
+        }
+<span class="nc bnc" id="L498" title="All 2 branches missed.">        if (gav != null) {</span>
+<span class="nc" id="L499">            sb.append(&quot;gav=&quot;).append(gav).append(',');</span>
+        }
+<span class="nc bnc" id="L501" title="All 4 branches missed.">        if (cpe != null &amp;&amp; !cpe.isEmpty()) {</span>
+<span class="nc" id="L502">            sb.append(&quot;cpe={&quot;);</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            for (PropertyType pt : cpe) {</span>
+<span class="nc" id="L504">                sb.append(pt).append(',');</span>
+<span class="nc" id="L505">            }</span>
+<span class="nc" id="L506">            sb.append('}');</span>
+        }
+<span class="nc bnc" id="L508" title="All 4 branches missed.">        if (cwe != null &amp;&amp; !cwe.isEmpty()) {</span>
+<span class="nc" id="L509">            sb.append(&quot;cwe={&quot;);</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">            for (String s : cwe) {</span>
+<span class="nc" id="L511">                sb.append(s).append(',');</span>
+<span class="nc" id="L512">            }</span>
+<span class="nc" id="L513">            sb.append('}');</span>
+        }
+<span class="nc bnc" id="L515" title="All 4 branches missed.">        if (cve != null &amp;&amp; !cve.isEmpty()) {</span>
+<span class="nc" id="L516">            sb.append(&quot;cve={&quot;);</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">            for (String s : cve) {</span>
+<span class="nc" id="L518">                sb.append(s).append(',');</span>
+<span class="nc" id="L519">            }</span>
+<span class="nc" id="L520">            sb.append('}');</span>
+        }
+<span class="nc bnc" id="L522" title="All 4 branches missed.">        if (cvssBelow != null &amp;&amp; !cvssBelow.isEmpty()) {</span>
+<span class="nc" id="L523">            sb.append(&quot;cvssBelow={&quot;);</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">            for (Float s : cvssBelow) {</span>
+<span class="nc" id="L525">                sb.append(s).append(',');</span>
+<span class="nc" id="L526">            }</span>
+<span class="nc" id="L527">            sb.append('}');</span>
+        }
+<span class="nc" id="L529">        sb.append('}');</span>
+<span class="nc" id="L530">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

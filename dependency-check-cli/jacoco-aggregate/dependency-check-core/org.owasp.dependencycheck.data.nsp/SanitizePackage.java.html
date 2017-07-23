@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SanitizePackage.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.data.nsp</a> &gt; <span class="el_source">SanitizePackage.java</span></div><h1>SanitizePackage.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2017 Steve Springett. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.data.nsp;
+
+import javax.json.Json;
+import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
+import javax.json.JsonValue;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Class used to create a Sanitized version of package.json suitable for
+ * submission to the nsp/check service.
+ *
+ * @author Steve Springett
+ */
+public final class SanitizePackage {
+
+    /**
+     * Private constructor for utility class.
+     */
+<span class="nc" id="L40">    private SanitizePackage() {</span>
+        //empty
+<span class="nc" id="L42">    }</span>
+    /**
+     * Specifies a whitelist of allowable objects that package.json should
+     * contain.
+     */
+<span class="fc" id="L47">    private static final List&lt;String&gt; WHITELIST = new ArrayList&lt;&gt;(Arrays.asList(</span>
+            &quot;name&quot;,
+            &quot;version&quot;,
+            &quot;engine&quot;,
+            &quot;dependencies&quot;,
+            &quot;devDependencies&quot;,
+            &quot;optionalDependencies&quot;,
+            &quot;peerDependencies&quot;,
+            &quot;bundleDependencies&quot;,
+            &quot;bundledDependencies&quot;
+    ));
+
+    /**
+     * The NSP API only accepts a subset of objects typically found in
+     * package.json. This method accepts a JsonObject of a raw package.json file
+     * and returns a new 'sanitized' version based on a pre-defined whitelist of
+     * allowable object NSP accepts.
+     *
+     * @param rawPackage a raw package.json file
+     * @return a sanitized version of the package.json file
+     */
+    public static JsonObject sanitize(JsonObject rawPackage) {
+<span class="fc" id="L69">        final JsonObjectBuilder builder = Json.createObjectBuilder();</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (Map.Entry&lt;String, JsonValue&gt; entry : rawPackage.entrySet()) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (WHITELIST.contains(entry.getKey())) {</span>
+<span class="fc" id="L72">                builder.add(entry.getKey(), entry.getValue());</span>
+            }
+<span class="fc" id="L74">        }</span>
+<span class="fc" id="L75">        return builder.build();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Identifier.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.dependency</a> &gt; <span class="el_source">Identifier.java</span></div><h1>Identifier.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.dependency;
+
+import java.io.Serializable;
+
+/**
+ * In identifier such as a CPE or dependency coordinates (i.e. GAV).
+ *
+ * @author Jeremy Long
+ */
+public class Identifier implements Serializable, Comparable&lt;Identifier&gt; {
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;fields&quot;&gt;
+    /**
+     * The serial version UID for serialization.
+     */
+    private static final long serialVersionUID = 1L;
+    /**
+     * The confidence that this is the correct identifier.
+     */
+    private Confidence confidence;
+    /**
+     * The value of the identifier
+     */
+    private String value;
+    /**
+     * The url for the identifier.
+     */
+    private String url;
+    /**
+     * The type of the identifier.
+     */
+    private String type;
+    /**
+     * A description of the identifier.
+     */
+    private String description;
+    /**
+     * Notes about the vulnerability. Generally used for suppression
+     * information.
+     */
+    private String notes;
+    //&lt;/editor-fold&gt;
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;getters/setters&quot;&gt;
+    /**
+     * Get the value of confidence.
+     *
+     * @return the value of confidence
+     */
+    public Confidence getConfidence() {
+<span class="fc" id="L68">        return confidence;</span>
+    }
+
+    /**
+     * Set the value of confidence.
+     *
+     * @param confidence new value of confidence
+     */
+    public void setConfidence(Confidence confidence) {
+<span class="fc" id="L77">        this.confidence = confidence;</span>
+<span class="fc" id="L78">    }</span>
+
+    /**
+     * Get the value of value.
+     *
+     * @return the value of value
+     */
+    public String getValue() {
+<span class="fc" id="L86">        return value;</span>
+    }
+
+    /**
+     * Set the value of value.
+     *
+     * @param value new value of value
+     */
+    public void setValue(String value) {
+<span class="nc" id="L95">        this.value = value;</span>
+<span class="nc" id="L96">    }</span>
+
+    /**
+     * Get the value of url.
+     *
+     * @return the value of url
+     */
+    public String getUrl() {
+<span class="fc" id="L104">        return url;</span>
+    }
+
+    /**
+     * Set the value of url.
+     *
+     * @param url new value of url
+     */
+    public void setUrl(String url) {
+<span class="fc" id="L113">        this.url = url;</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * Get the value of type.
+     *
+     * @return the value of type
+     */
+    public String getType() {
+<span class="fc" id="L122">        return type;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Set the value of type.&lt;/p&gt;&lt;p&gt;
+     * Example would be &quot;CPE&quot;.&lt;/p&gt;
+     *
+     * @param type new value of type
+     */
+    public void setType(String type) {
+<span class="nc" id="L133">        this.type = type;</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Get the value of description.
+     *
+     * @return the value of description
+     */
+    public String getDescription() {
+<span class="fc" id="L142">        return description;</span>
+    }
+
+    /**
+     * Set the value of description.
+     *
+     * @param description new value of description
+     */
+    public void setDescription(String description) {
+<span class="nc" id="L151">        this.description = description;</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Get the value of notes from suppression notes.
+     *
+     * @return the value of notes
+     */
+    public String getNotes() {
+<span class="fc" id="L160">        return notes;</span>
+    }
+
+    /**
+     * Set the value of notes.
+     *
+     * @param notes new value of notes
+     */
+    public void setNotes(String notes) {
+<span class="fc" id="L169">        this.notes = notes;</span>
+<span class="fc" id="L170">    }</span>
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Default constructor. Should only be used for automatic class creation as
+     * is the case with many XML parsers (for the parsing of the
+     * Dependency-Check XML report). For all other use-cases, please use the
+     * non-default constructors.
+     */
+<span class="nc" id="L179">    public Identifier() {</span>
+<span class="nc" id="L180">    }</span>
+
+    /**
+     * Constructs a new Identifier with the specified data.
+     *
+     * @param type the identifier type.
+     * @param value the identifier value.
+     * @param url the identifier url.
+     */
+<span class="fc" id="L189">    public Identifier(String type, String value, String url) {</span>
+<span class="fc" id="L190">        this.type = type;</span>
+<span class="fc" id="L191">        this.value = value;</span>
+<span class="fc" id="L192">        this.url = url;</span>
+<span class="fc" id="L193">    }</span>
+
+    /**
+     * Constructs a new Identifier with the specified data.
+     *
+     * @param type the identifier type.
+     * @param value the identifier value.
+     * @param url the identifier url.
+     * @param description the description of the identifier.
+     */
+    public Identifier(String type, String value, String url, String description) {
+<span class="fc" id="L204">        this(type, value, url);</span>
+<span class="fc" id="L205">        this.description = description;</span>
+<span class="fc" id="L206">    }</span>
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (obj == null) {</span>
+<span class="nc" id="L211">            return false;</span>
+        }
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (getClass() != obj.getClass()) {</span>
+<span class="nc" id="L214">            return false;</span>
+        }
+<span class="nc" id="L216">        final Identifier other = (Identifier) obj;</span>
+<span class="nc bnc" id="L217" title="All 6 branches missed.">        if ((this.value == null) ? (other.value != null) : !this.value.equals(other.value)) {</span>
+<span class="nc" id="L218">            return false;</span>
+        }
+<span class="nc bnc" id="L220" title="All 6 branches missed.">        return !((this.type == null) ? (other.type != null) : !this.type.equals(other.type));</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L225">        int hash = 5;</span>
+<span class="pc bpc" id="L226" title="1 of 2 branches missed.">        hash = 53 * hash + (this.value != null ? this.value.hashCode() : 0);</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        hash = 53 * hash + (this.type != null ? this.type.hashCode() : 0);</span>
+<span class="fc" id="L228">        return hash;</span>
+    }
+
+    /**
+     * Standard implementation of toString; displays identifier value and type.
+     *
+     * @return a String representation of the object
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L238">        return &quot;Identifier{&quot; + &quot;value=&quot; + value + &quot;, type=&quot; + type + '}';</span>
+    }
+
+    /**
+     * Implementation of the comparator interface. This compares the value of
+     * the identifier only.
+     *
+     * @param o the object being compared
+     * @return an integer indicating the ordering
+     */
+    @Override
+    public int compareTo(Identifier o) {
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L251">            return -1;</span>
+        }
+<span class="fc" id="L253">        return this.value.compareTo(o.value);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>XmlUtils.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Core</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-utils</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.utils</a> &gt; <span class="el_source">XmlUtils.java</span></div><h1>XmlUtils.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2016 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.utils;
+
+import java.io.InputStream;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXNotRecognizedException;
+import org.xml.sax.SAXNotSupportedException;
+import org.xml.sax.SAXParseException;
+
+/**
+ * Collection of XML related code.
+ *
+ * @author Jeremy Long
+ */
+public final class XmlUtils {
+
+    /**
+     * JAXP Schema Language. Source:
+     * http://docs.oracle.com/javase/tutorial/jaxp/sax/validation.html
+     */
+    public static final String JAXP_SCHEMA_LANGUAGE = &quot;http://java.sun.com/xml/jaxp/properties/schemaLanguage&quot;;
+    /**
+     * W3C XML Schema. Source:
+     * http://docs.oracle.com/javase/tutorial/jaxp/sax/validation.html
+     */
+    public static final String W3C_XML_SCHEMA = &quot;http://www.w3.org/2001/XMLSchema&quot;;
+    /**
+     * JAXP Schema Source. Source:
+     * http://docs.oracle.com/javase/tutorial/jaxp/sax/validation.html
+     */
+    public static final String JAXP_SCHEMA_SOURCE = &quot;http://java.sun.com/xml/jaxp/properties/schemaSource&quot;;
+
+    /**
+     * Private constructor for a utility class.
+     */
+<span class="nc" id="L58">    private XmlUtils() {</span>
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * Constructs a validating secure SAX Parser.
+     *
+     * @param schemaStream the schema to validate the XML against
+     * @return a SAX Parser
+     * @throws ParserConfigurationException is thrown if there is a parser
+     * configuration exception
+     * @throws SAXNotRecognizedException thrown if there is an unrecognized
+     * feature
+     * @throws SAXNotSupportedException thrown if there is a non-supported
+     * feature
+     * @throws SAXException is thrown if there is a SAXException
+     */
+    public static SAXParser buildSecureSaxParser(InputStream schemaStream) throws ParserConfigurationException,
+            SAXNotRecognizedException, SAXNotSupportedException, SAXException {
+<span class="fc" id="L76">        final SAXParserFactory factory = SAXParserFactory.newInstance();</span>
+<span class="fc" id="L77">        factory.setNamespaceAware(true);</span>
+<span class="fc" id="L78">        factory.setValidating(true);</span>
+<span class="fc" id="L79">        factory.setFeature(&quot;http://apache.org/xml/features/disallow-doctype-decl&quot;, true);</span>
+<span class="fc" id="L80">        factory.setFeature(&quot;http://xml.org/sax/features/external-general-entities&quot;, false);</span>
+        //setting the following unfortunately breaks reading the old suppression files (version 1).
+        //factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+
+<span class="fc" id="L84">        final SAXParser saxParser = factory.newSAXParser();</span>
+<span class="fc" id="L85">        saxParser.setProperty(JAXP_SCHEMA_LANGUAGE, W3C_XML_SCHEMA);</span>
+<span class="fc" id="L86">        saxParser.setProperty(JAXP_SCHEMA_SOURCE, schemaStream);</span>
+<span class="fc" id="L87">        return saxParser;</span>
+    }
+
+    /**
+     * Constructs a secure SAX Parser.
+     *
+     * @return a SAX Parser
+     * @throws ParserConfigurationException thrown if there is a parser
+     * configuration exception
+     * @throws SAXNotRecognizedException thrown if there is an unrecognized
+     * feature
+     * @throws SAXNotSupportedException thrown if there is a non-supported
+     * feature
+     * @throws SAXException is thrown if there is a SAXException
+     */
+    public static SAXParser buildSecureSaxParser() throws ParserConfigurationException,
+            SAXNotRecognizedException, SAXNotSupportedException, SAXException {
+<span class="fc" id="L104">        final SAXParserFactory factory = SAXParserFactory.newInstance();</span>
+<span class="fc" id="L105">        factory.setFeature(&quot;http://apache.org/xml/features/disallow-doctype-decl&quot;, true);</span>
+<span class="fc" id="L106">        factory.setFeature(&quot;http://xml.org/sax/features/external-general-entities&quot;, false);</span>
+<span class="fc" id="L107">        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);</span>
+<span class="fc" id="L108">        return factory.newSAXParser();</span>
+    }
+
+    /**
+     * Constructs a new document builder with security features enabled.
+     *
+     * @return a new document builder
+     * @throws ParserConfigurationException thrown if there is a parser
+     * configuration exception
+     */
+    public static DocumentBuilder buildSecureDocumentBuilder() throws ParserConfigurationException {
+<span class="fc" id="L119">        final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();</span>
+<span class="fc" id="L120">        factory.setFeature(&quot;http://apache.org/xml/features/disallow-doctype-decl&quot;, true);</span>
+<span class="fc" id="L121">        factory.setFeature(&quot;http://xml.org/sax/features/external-general-entities&quot;, false);</span>
+<span class="fc" id="L122">        factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);</span>
+<span class="fc" id="L123">        return factory.newDocumentBuilder();</span>
+    }
+
+    /**
+     * Builds a prettier exception message.
+     *
+     * @param ex the SAXParseException
+     * @return an easier to read exception message
+     */
+    public static String getPrettyParseExceptionInfo(SAXParseException ex) {
+
+<span class="fc" id="L134">        final StringBuilder sb = new StringBuilder();</span>
+
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (ex.getSystemId() != null) {</span>
+<span class="nc" id="L137">            sb.append(&quot;systemId=&quot;).append(ex.getSystemId()).append(&quot;, &quot;);</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (ex.getPublicId() != null) {</span>
+<span class="nc" id="L140">            sb.append(&quot;publicId=&quot;).append(ex.getPublicId()).append(&quot;, &quot;);</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (ex.getLineNumber() &gt; 0) {</span>
+<span class="fc" id="L143">            sb.append(&quot;Line=&quot;).append(ex.getLineNumber());</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (ex.getColumnNumber() &gt; 0) {</span>
+<span class="fc" id="L146">            sb.append(&quot;, Column=&quot;).append(ex.getColumnNumber());</span>
+        }
+<span class="fc" id="L148">        sb.append(&quot;: &quot;).append(ex.getMessage());</span>
+
+<span class="fc" id="L150">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

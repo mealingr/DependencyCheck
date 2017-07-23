@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SuppressionParser.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.xml.suppression</a> &gt; <span class="el_source">SuppressionParser.java</span></div><h1>SuppressionParser.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.xml.suppression;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.util.List;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+
+import org.owasp.dependencycheck.utils.FileUtils;
+import org.owasp.dependencycheck.utils.XmlUtils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
+
+/**
+ * A simple validating parser for XML Suppression Rules.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L45">public class SuppressionParser {</span>
+
+    /**
+     * The logger.
+     */
+<span class="fc" id="L50">    private static final Logger LOGGER = LoggerFactory.getLogger(SuppressionParser.class);</span>
+    /**
+     * The suppression schema file location.
+     */
+    public static final String SUPPRESSION_SCHEMA = &quot;schema/dependency-suppression.1.1.xsd&quot;;
+    /**
+     * The old suppression schema file location.
+     */
+    private static final String OLD_SUPPRESSION_SCHEMA = &quot;schema/suppression.xsd&quot;;
+
+    /**
+     * Parses the given XML file and returns a list of the suppression rules
+     * contained.
+     *
+     * @param file an XML file containing suppression rules
+     * @return a list of suppression rules
+     * @throws SuppressionParseException thrown if the XML file cannot be parsed
+     */
+    public List&lt;SuppressionRule&gt; parseSuppressionRules(File file) throws SuppressionParseException {
+        try {
+<span class="fc" id="L70">            try (FileInputStream fis = new FileInputStream(file)) {</span>
+<span class="fc" id="L71">                return parseSuppressionRules(fis);</span>
+<span class="pc bpc" id="L72" title="4 of 8 branches missed.">            } catch (IOException ex) {</span>
+<span class="nc" id="L73">                LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L74">                throw new SuppressionParseException(ex);</span>
+            }
+<span class="fc" id="L76">        } catch (SAXException ex) {</span>
+<span class="pc" id="L77">            try (FileInputStream fis = new FileInputStream(file)) {</span>
+<span class="fc" id="L78">                return parseSuppressionRules(fis, OLD_SUPPRESSION_SCHEMA);</span>
+<span class="pc bpc" id="L79" title="6 of 8 branches missed.">            } catch (SAXException | IOException ex1) {</span>
+<span class="nc" id="L80">                throw new SuppressionParseException(ex);</span>
+            }
+        }
+    }
+
+    /**
+     * Parses the given XML stream and returns a list of the suppression rules
+     * contained.
+     *
+     * @param inputStream an InputStream containing suppression rules
+     * @return a list of suppression rules
+     * @throws SuppressionParseException thrown if the XML cannot be parsed
+     * @throws SAXException thrown if the XML cannot be parsed
+     */
+    public List&lt;SuppressionRule&gt; parseSuppressionRules(InputStream inputStream) throws SuppressionParseException, SAXException {
+<span class="fc" id="L95">        return parseSuppressionRules(inputStream, SUPPRESSION_SCHEMA);</span>
+    }
+
+    /**
+     * Parses the given XML stream and returns a list of the suppression rules
+     * contained.
+     *
+     * @param inputStream an InputStream containing suppression rules
+     * @param schema the schema used to validate the XML stream
+     * @return a list of suppression rules
+     * @throws SuppressionParseException thrown if the XML cannot be parsed
+     * @throws SAXException thrown if the XML cannot be parsed
+     */
+    private List&lt;SuppressionRule&gt; parseSuppressionRules(InputStream inputStream, String schema) throws SuppressionParseException, SAXException {
+<span class="fc" id="L109">        try (InputStream schemaStream = FileUtils.getResourceAsStream(schema)) {</span>
+<span class="fc" id="L110">            final SuppressionHandler handler = new SuppressionHandler();</span>
+<span class="fc" id="L111">            final SAXParser saxParser = XmlUtils.buildSecureSaxParser(schemaStream);</span>
+<span class="fc" id="L112">            final XMLReader xmlReader = saxParser.getXMLReader();</span>
+<span class="fc" id="L113">            xmlReader.setErrorHandler(new SuppressionErrorHandler());</span>
+<span class="fc" id="L114">            xmlReader.setContentHandler(handler);</span>
+<span class="fc" id="L115">            try (Reader reader = new InputStreamReader(inputStream, &quot;UTF-8&quot;)) {</span>
+<span class="fc" id="L116">                final InputSource in = new InputSource(reader);</span>
+<span class="fc" id="L117">                xmlReader.parse(in);</span>
+<span class="fc" id="L118">                return handler.getSuppressionRules();</span>
+<span class="pc bpc" id="L119" title="4 of 8 branches missed.">            }</span>
+<span class="pc bpc" id="L120" title="4 of 8 branches missed.">        } catch (ParserConfigurationException | FileNotFoundException ex) {</span>
+<span class="nc" id="L121">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L122">            throw new SuppressionParseException(ex);</span>
+<span class="fc" id="L123">        } catch (SAXException ex) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (ex.getMessage().contains(&quot;Cannot find the declaration of element 'suppressions'.&quot;)) {</span>
+<span class="fc" id="L125">                throw ex;</span>
+            } else {
+<span class="nc" id="L127">                LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L128">                throw new SuppressionParseException(ex);</span>
+            }
+<span class="nc" id="L130">        } catch (IOException ex) {</span>
+<span class="nc" id="L131">            LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L132">            throw new SuppressionParseException(ex);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

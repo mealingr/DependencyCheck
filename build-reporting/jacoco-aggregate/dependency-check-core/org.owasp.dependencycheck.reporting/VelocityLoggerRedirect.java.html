@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>VelocityLoggerRedirect.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Build-Reporting</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.reporting</a> &gt; <span class="el_source">VelocityLoggerRedirect.java</span></div><h1>VelocityLoggerRedirect.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2013 Steve Springett. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.reporting;
+
+import org.apache.velocity.runtime.RuntimeServices;
+import org.apache.velocity.runtime.log.LogChute;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * &lt;p&gt;
+ * DependencyCheck uses {@link org.slf4j.Logger} as a logging framework, and
+ * Apache Velocity uses a custom logging implementation that outputs to a file
+ * named velocity.log by default. This class is an implementation of a custom
+ * Velocity logger that redirects all velocity logging to the Java Logger class.
+ * &lt;/p&gt;&lt;p&gt;
+ * This class was written to address permission issues when using
+ * Dependency-Check in a server environment (such as the Jenkins plugin). In
+ * some circumstances, Velocity would attempt to create velocity.log in an
+ * un-writable directory.&lt;/p&gt;
+ *
+ * @author Steve Springett
+ */
+<span class="fc" id="L39">public class VelocityLoggerRedirect implements LogChute {</span>
+
+    /**
+     * The Logger.
+     */
+<span class="fc" id="L44">    private static final Logger LOGGER = LoggerFactory.getLogger(VelocityLoggerRedirect.class);</span>
+
+    /**
+     * This will be invoked once by the LogManager.
+     *
+     * @param rsvc the RuntimeServices
+     */
+    @Override
+    public void init(RuntimeServices rsvc) {
+        // do nothing
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Given a Velocity log level and message, this method will call the
+     * appropriate Logger level and log the specified values.
+     *
+     * @param level the logging level
+     * @param message the message to be logged
+     */
+    @Override
+    public void log(int level, String message) {
+<span class="pc bpc" id="L65" title="4 of 6 branches missed.">        switch (level) {</span>
+            case TRACE_ID:
+<span class="fc" id="L67">                LOGGER.trace(message);</span>
+<span class="fc" id="L68">                break;</span>
+            case DEBUG_ID:
+<span class="fc" id="L70">                LOGGER.debug(message);</span>
+<span class="fc" id="L71">                break;</span>
+            case INFO_ID:
+<span class="nc" id="L73">                LOGGER.info(message);</span>
+<span class="nc" id="L74">                break;</span>
+            case WARN_ID:
+<span class="nc" id="L76">                LOGGER.warn(message);</span>
+<span class="nc" id="L77">                break;</span>
+            case ERROR_ID:
+<span class="nc" id="L79">                LOGGER.error(message);</span>
+<span class="nc" id="L80">                break;</span>
+            default:
+<span class="nc" id="L82">                LOGGER.info(message);</span>
+                break;
+        }
+<span class="fc" id="L85">    }</span>
+
+    /**
+     * Given a Velocity log level, message and Throwable, this method will call
+     * the appropriate Logger level and log the specified values.
+     *
+     * @param level the logging level
+     * @param message the message to be logged
+     * @param t a throwable to log
+     */
+    @Override
+    public void log(int level, String message, Throwable t) {
+<span class="nc bnc" id="L97" title="All 6 branches missed.">        switch (level) {</span>
+            case TRACE_ID:
+<span class="nc" id="L99">                LOGGER.trace(message, t);</span>
+<span class="nc" id="L100">                break;</span>
+            case DEBUG_ID:
+<span class="nc" id="L102">                LOGGER.debug(message, t);</span>
+<span class="nc" id="L103">                break;</span>
+            case INFO_ID:
+<span class="nc" id="L105">                LOGGER.info(message, t);</span>
+<span class="nc" id="L106">                break;</span>
+            case WARN_ID:
+<span class="nc" id="L108">                LOGGER.warn(message, t);</span>
+<span class="nc" id="L109">                break;</span>
+            case ERROR_ID:
+<span class="nc" id="L111">                LOGGER.error(message, t);</span>
+<span class="nc" id="L112">                break;</span>
+            default:
+<span class="nc" id="L114">                LOGGER.info(message, t);</span>
+                break;
+        }
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * Will always return true. The property file will decide what level to log.
+     *
+     * @param level the logging level
+     * @return true
+     */
+    @Override
+    public boolean isLevelEnabled(int level) {
+<span class="fc" id="L127">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

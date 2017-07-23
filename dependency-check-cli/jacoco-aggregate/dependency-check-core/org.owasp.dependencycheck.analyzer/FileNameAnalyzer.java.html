@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FileNameAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">FileNameAnalyzer.java</span></div><h1>FileNameAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.File;
+
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.filefilter.NameFileFilter;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Confidence;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.utils.DependencyVersion;
+import org.owasp.dependencycheck.utils.DependencyVersionUtil;
+import org.owasp.dependencycheck.utils.Settings;
+
+/**
+ *
+ * Takes a dependency and analyzes the filename and determines the hashes.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L38">public class FileNameAnalyzer extends AbstractAnalyzer {</span>
+
+    /**
+     * Python init files
+     */
+    //CSOFF: WhitespaceAfter
+<span class="fc" id="L44">    private static final NameFileFilter IGNORED_FILES = new NameFileFilter(new String[]{</span>
+        &quot;__init__.py&quot;,
+        &quot;__init__.pyc&quot;,
+        &quot;__init__.pyo&quot;,});
+    //CSON: WhitespaceAfter
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;All standard implementation details of Analyzer&quot;&gt;
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;File Name Analyzer&quot;;
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L58">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.INFORMATION_COLLECTION;</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L67">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L77">        return ANALYSIS_PHASE;</span>
+    }
+    /**
+     * &lt;p&gt;
+     * Returns the setting key to determine if the analyzer is enabled.&lt;/p&gt;
+     *
+     * @return the key for the analyzer's enabled property
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L87">        return Settings.KEYS.ANALYZER_FILE_NAME_ENABLED;</span>
+    }
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Collects information about the file name.
+     *
+     * @param dependency the dependency to analyze.
+     * @param engine the engine that is scanning the dependencies
+     * @throws AnalysisException is thrown if there is an error reading the JAR
+     * file.
+     */
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine) throws AnalysisException {
+
+        //strip any path information that may get added by ArchiveAnalyzer, etc.
+<span class="fc" id="L103">        final File f = dependency.getActualFile();</span>
+<span class="fc" id="L104">        final String fileName = FilenameUtils.removeExtension(f.getName());</span>
+
+        //add version evidence
+<span class="fc" id="L107">        final DependencyVersion version = DependencyVersionUtil.parseVersion(fileName);</span>
+<span class="fc" id="L108">        final String packageName = DependencyVersionUtil.parsePreVersion(fileName);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (version != null) {</span>
+            // If the version number is just a number like 2 or 23, reduce the confidence
+            // a shade. This should hopefully correct for cases like log4j.jar or
+            // struts2-core.jar
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">            if (version.getVersionParts() == null || version.getVersionParts().size() &lt; 2) {</span>
+<span class="fc" id="L114">                dependency.getVersionEvidence().addEvidence(&quot;file&quot;, &quot;version&quot;,</span>
+                        version.toString(), Confidence.MEDIUM);
+            } else {
+<span class="fc" id="L117">                dependency.getVersionEvidence().addEvidence(&quot;file&quot;, &quot;version&quot;,</span>
+                        version.toString(), Confidence.HIGHEST);
+            }
+<span class="fc" id="L120">            dependency.getVersionEvidence().addEvidence(&quot;file&quot;, &quot;name&quot;,</span>
+                    packageName, Confidence.MEDIUM);
+        }
+
+<span class="fc bfc" id="L124" title="All 2 branches covered.">        if (!IGNORED_FILES.accept(f)) {</span>
+<span class="fc" id="L125">            dependency.getProductEvidence().addEvidence(&quot;file&quot;, &quot;name&quot;,</span>
+                    packageName, Confidence.HIGH);
+<span class="fc" id="L127">            dependency.getVendorEvidence().addEvidence(&quot;file&quot;, &quot;name&quot;,</span>
+                    packageName, Confidence.HIGH);
+        }
+<span class="fc" id="L130">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>

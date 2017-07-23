@@ -1,0 +1,507 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FalsePositiveAnalyzer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Dependency-Check Command Line</a> &gt; <a href="../index.html" class="el_bundle">dependency-check-core</a> &gt; <a href="index.source.html" class="el_package">org.owasp.dependencycheck.analyzer</a> &gt; <span class="el_source">FalsePositiveAnalyzer.java</span></div><h1>FalsePositiveAnalyzer.java</h1><pre class="source lang-java linenums">/*
+ * This file is part of dependency-check-core.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright (c) 2012 Jeremy Long. All Rights Reserved.
+ */
+package org.owasp.dependencycheck.analyzer;
+
+import java.io.FileFilter;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.owasp.dependencycheck.Engine;
+import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
+import org.owasp.dependencycheck.dependency.Dependency;
+import org.owasp.dependencycheck.dependency.Identifier;
+import org.owasp.dependencycheck.dependency.VulnerableSoftware;
+import org.owasp.dependencycheck.utils.FileFilterBuilder;
+import org.owasp.dependencycheck.utils.Settings;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * This analyzer attempts to remove some well known false positives -
+ * specifically regarding the java runtime.
+ *
+ * @author Jeremy Long
+ */
+<span class="fc" id="L47">public class FalsePositiveAnalyzer extends AbstractAnalyzer {</span>
+
+    /**
+     * The Logger.
+     */
+<span class="fc" id="L52">    private static final Logger LOGGER = LoggerFactory.getLogger(FalsePositiveAnalyzer.class);</span>
+    /**
+     * The file filter used to find DLL and EXE.
+     */
+<span class="fc" id="L56">    private static final FileFilter DLL_EXE_FILTER = FileFilterBuilder.newInstance().addExtensions(&quot;dll&quot;, &quot;exe&quot;).build();</span>
+    /**
+     * Regex to identify core java libraries and a few other commonly
+     * misidentified ones.
+     */
+<span class="fc" id="L61">    public static final Pattern CORE_JAVA = Pattern.compile(&quot;^cpe:/a:(sun|oracle|ibm):(j2[ems]e|&quot;</span>
+            + &quot;java(_platform_micro_edition|_runtime_environment|_se|virtual_machine|se_development_kit|fx)?|&quot;
+            + &quot;jdk|jre|jsse)($|:.*)&quot;);
+    /**
+     * Regex to identify core jsf libraries.
+     */
+<span class="fc" id="L67">    public static final Pattern CORE_JAVA_JSF = Pattern.compile(&quot;^cpe:/a:(sun|oracle|ibm):jsf($|:.*)&quot;);</span>
+    /**
+     * Regex to identify core java library files. This is currently incomplete.
+     */
+<span class="fc" id="L71">    public static final Pattern CORE_FILES = Pattern.compile(&quot;(^|/)((alt[-])?rt|jsse|jfxrt|jfr|jce|javaws|deploy|charsets)\\.jar$&quot;);</span>
+    /**
+     * Regex to identify core jsf java library files. This is currently
+     * incomplete.
+     */
+<span class="fc" id="L76">    public static final Pattern CORE_JSF_FILES = Pattern.compile(&quot;(^|/)jsf[-][^/]*\\.jar$&quot;);</span>
+
+    //&lt;editor-fold defaultstate=&quot;collapsed&quot; desc=&quot;All standard implementation details of Analyzer&quot;&gt;
+    /**
+     * The name of the analyzer.
+     */
+    private static final String ANALYZER_NAME = &quot;False Positive Analyzer&quot;;
+    /**
+     * The phase that this analyzer is intended to run in.
+     */
+<span class="fc" id="L86">    private static final AnalysisPhase ANALYSIS_PHASE = AnalysisPhase.POST_IDENTIFIER_ANALYSIS;</span>
+
+    /**
+     * Returns the name of the analyzer.
+     *
+     * @return the name of the analyzer.
+     */
+    @Override
+    public String getName() {
+<span class="fc" id="L95">        return ANALYZER_NAME;</span>
+    }
+
+    /**
+     * Returns the phase that the analyzer is intended to run in.
+     *
+     * @return the phase that the analyzer is intended to run in.
+     */
+    @Override
+    public AnalysisPhase getAnalysisPhase() {
+<span class="fc" id="L105">        return ANALYSIS_PHASE;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Returns the setting key to determine if the analyzer is enabled.&lt;/p&gt;
+     *
+     * @return the key for the analyzer's enabled property
+     */
+    @Override
+    protected String getAnalyzerEnabledSettingKey() {
+<span class="fc" id="L116">        return Settings.KEYS.ANALYZER_FALSE_POSITIVE_ENABLED;</span>
+    }
+    //&lt;/editor-fold&gt;
+
+    /**
+     * Analyzes the dependencies and removes bad/incorrect CPE associations
+     * based on various heuristics.
+     *
+     * @param dependency the dependency to analyze.
+     * @param engine the engine that is scanning the dependencies
+     * @throws AnalysisException is thrown if there is an error reading the JAR
+     * file.
+     */
+    @Override
+    protected void analyzeDependency(Dependency dependency, Engine engine) throws AnalysisException {
+<span class="fc" id="L131">        removeJreEntries(dependency);</span>
+<span class="fc" id="L132">        removeBadMatches(dependency);</span>
+<span class="fc" id="L133">        removeBadSpringMatches(dependency);</span>
+<span class="fc" id="L134">        removeWrongVersionMatches(dependency);</span>
+<span class="fc" id="L135">        removeSpuriousCPE(dependency);</span>
+<span class="fc" id="L136">        removeDuplicativeEntriesFromJar(dependency, engine);</span>
+<span class="fc" id="L137">        addFalseNegativeCPEs(dependency);</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Removes inaccurate matches on springframework CPEs.
+     *
+     * @param dependency the dependency to test for and remove known inaccurate
+     * CPE matches
+     */
+    private void removeBadSpringMatches(Dependency dependency) {
+<span class="fc" id="L147">        String mustContain = null;</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (Identifier i : dependency.getIdentifiers()) {</span>
+<span class="pc bpc" id="L149" title="1 of 6 branches missed.">            if (&quot;maven&quot;.contains(i.getType())</span>
+                    &amp;&amp; i.getValue() != null &amp;&amp; i.getValue().startsWith(&quot;org.springframework.&quot;)) {
+<span class="fc" id="L151">                final int endPoint = i.getValue().indexOf(':', 19);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                if (endPoint &gt;= 0) {</span>
+<span class="fc" id="L153">                    mustContain = i.getValue().substring(19, endPoint).toLowerCase();</span>
+<span class="fc" id="L154">                    break;</span>
+                }
+            }
+<span class="fc" id="L157">        }</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (mustContain</span>
+                != null) {
+<span class="fc" id="L160">            final Iterator&lt;Identifier&gt; itr = dependency.getIdentifiers().iterator();</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L162">                final Identifier i = itr.next();</span>
+<span class="pc bpc" id="L163" title="2 of 8 branches missed.">                if (&quot;cpe&quot;.contains(i.getType())</span>
+                        &amp;&amp; i.getValue() != null
+                        &amp;&amp; i.getValue().startsWith(&quot;cpe:/a:springsource:&quot;)
+                        &amp;&amp; !i.getValue().toLowerCase().contains(mustContain)) {
+<span class="fc" id="L167">                    itr.remove();</span>
+                    //dependency.getIdentifiers().remove(i);
+                }
+<span class="fc" id="L170">            }</span>
+        }
+<span class="fc" id="L172">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Intended to remove spurious CPE entries. By spurious we mean duplicate,
+     * less specific CPE entries.&lt;/p&gt;
+     * &lt;p&gt;
+     * Example:&lt;/p&gt;
+     * &lt;code&gt;
+     * cpe:/a:some-vendor:some-product
+     * cpe:/a:some-vendor:some-product:1.5
+     * cpe:/a:some-vendor:some-product:1.5.2
+     * &lt;/code&gt;
+     * &lt;p&gt;
+     * Should be trimmed to:&lt;/p&gt;
+     * &lt;code&gt;
+     * cpe:/a:some-vendor:some-product:1.5.2
+     * &lt;/code&gt;
+     *
+     * @param dependency the dependency being analyzed
+     */
+    @SuppressWarnings(&quot;null&quot;)
+    private void removeSpuriousCPE(Dependency dependency) {
+<span class="fc" id="L195">        final List&lt;Identifier&gt; ids = new ArrayList&lt;&gt;(dependency.getIdentifiers());</span>
+<span class="fc" id="L196">        Collections.sort(ids);</span>
+<span class="fc" id="L197">        final ListIterator&lt;Identifier&gt; mainItr = ids.listIterator();</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        while (mainItr.hasNext()) {</span>
+<span class="fc" id="L199">            final Identifier currentId = mainItr.next();</span>
+<span class="fc" id="L200">            final VulnerableSoftware currentCpe = parseCpe(currentId.getType(), currentId.getValue());</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (currentCpe == null) {</span>
+<span class="fc" id="L202">                continue;</span>
+            }
+<span class="fc" id="L204">            final ListIterator&lt;Identifier&gt; subItr = ids.listIterator(mainItr.nextIndex());</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            while (subItr.hasNext()) {</span>
+<span class="fc" id="L206">                final Identifier nextId = subItr.next();</span>
+<span class="fc" id="L207">                final VulnerableSoftware nextCpe = parseCpe(nextId.getType(), nextId.getValue());</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">                if (nextCpe == null) {</span>
+<span class="fc" id="L209">                    continue;</span>
+                }
+                //TODO fix the version problem below
+<span class="fc bfc" id="L212" title="All 2 branches covered.">                if (currentCpe.getVendor().equals(nextCpe.getVendor())) {</span>
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">                    if (currentCpe.getProduct().equals(nextCpe.getProduct())) {</span>
+                        // see if one is contained in the other.. remove the contained one from dependency.getIdentifier
+<span class="nc" id="L215">                        final String currentVersion = currentCpe.getVersion();</span>
+<span class="nc" id="L216">                        final String nextVersion = nextCpe.getVersion();</span>
+<span class="nc bnc" id="L217" title="All 4 branches missed.">                        if (currentVersion == null &amp;&amp; nextVersion == null) {</span>
+                            //how did we get here?
+<span class="nc" id="L219">                            LOGGER.debug(&quot;currentVersion and nextVersion are both null?&quot;);</span>
+<span class="nc bnc" id="L220" title="All 4 branches missed.">                        } else if (currentVersion == null &amp;&amp; nextVersion != null) {</span>
+<span class="nc" id="L221">                            dependency.getIdentifiers().remove(currentId);</span>
+<span class="nc bnc" id="L222" title="All 4 branches missed.">                        } else if (nextVersion == null &amp;&amp; currentVersion != null) {</span>
+<span class="nc" id="L223">                            dependency.getIdentifiers().remove(nextId);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                        } else if (currentVersion.length() &lt; nextVersion.length()) {</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">                            if (nextVersion.startsWith(currentVersion) || &quot;-&quot;.equals(currentVersion)) {</span>
+<span class="nc" id="L226">                                dependency.getIdentifiers().remove(currentId);</span>
+                            }
+<span class="nc bnc" id="L228" title="All 4 branches missed.">                        } else if (currentVersion.startsWith(nextVersion) || &quot;-&quot;.equals(nextVersion)) {</span>
+<span class="nc" id="L229">                            dependency.getIdentifiers().remove(nextId);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L233">            }</span>
+<span class="fc" id="L234">        }</span>
+<span class="fc" id="L235">    }</span>
+
+    /**
+     * Removes any CPE entries for the JDK/JRE unless the filename ends with
+     * rt.jar
+     *
+     * @param dependency the dependency to remove JRE CPEs from
+     */
+    private void removeJreEntries(Dependency dependency) {
+<span class="fc" id="L244">        final Set&lt;Identifier&gt; identifiers = dependency.getIdentifiers();</span>
+<span class="fc" id="L245">        final Iterator&lt;Identifier&gt; itr = identifiers.iterator();</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">        while (itr.hasNext()) {</span>
+<span class="fc" id="L247">            final Identifier i = itr.next();</span>
+<span class="fc" id="L248">            final Matcher coreCPE = CORE_JAVA.matcher(i.getValue());</span>
+<span class="fc" id="L249">            final Matcher coreFiles = CORE_FILES.matcher(dependency.getFileName());</span>
+<span class="pc bpc" id="L250" title="1 of 4 branches missed.">            if (coreCPE.matches() &amp;&amp; !coreFiles.matches()) {</span>
+<span class="fc" id="L251">                itr.remove();</span>
+            }
+<span class="fc" id="L253">            final Matcher coreJsfCPE = CORE_JAVA_JSF.matcher(i.getValue());</span>
+<span class="fc" id="L254">            final Matcher coreJsfFiles = CORE_JSF_FILES.matcher(dependency.getFileName());</span>
+<span class="pc bpc" id="L255" title="1 of 4 branches missed.">            if (coreJsfCPE.matches() &amp;&amp; !coreJsfFiles.matches()) {</span>
+<span class="fc" id="L256">                itr.remove();</span>
+            }
+<span class="fc" id="L258">        }</span>
+<span class="fc" id="L259">    }</span>
+
+    /**
+     * Parses a CPE string into an IndexEntry.
+     *
+     * @param type the type of identifier
+     * @param value the cpe identifier to parse
+     * @return an VulnerableSoftware object constructed from the identifier
+     */
+    private VulnerableSoftware parseCpe(String type, String value) {
+<span class="fc bfc" id="L269" title="All 2 branches covered.">        if (!&quot;cpe&quot;.equals(type)) {</span>
+<span class="fc" id="L270">            return null;</span>
+        }
+<span class="fc" id="L272">        final VulnerableSoftware cpe = new VulnerableSoftware();</span>
+        try {
+<span class="fc" id="L274">            cpe.parseName(value);</span>
+<span class="nc" id="L275">        } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L276">            LOGGER.trace(&quot;&quot;, ex);</span>
+<span class="nc" id="L277">            return null;</span>
+<span class="fc" id="L278">        }</span>
+<span class="fc" id="L279">        return cpe;</span>
+    }
+
+    /**
+     * Removes bad CPE matches for a dependency. Unfortunately, right now these
+     * are hard-coded patches for specific problems identified when testing this
+     * on a LARGE volume of jar files.
+     *
+     * @param dependency the dependency to analyze
+     */
+    private void removeBadMatches(Dependency dependency) {
+<span class="fc" id="L290">        final Set&lt;Identifier&gt; identifiers = dependency.getIdentifiers();</span>
+<span class="fc" id="L291">        final Iterator&lt;Identifier&gt; itr = identifiers.iterator();</span>
+
+        /* TODO - can we utilize the pom's groupid and artifactId to filter??? most of
+         * these are due to low quality data.  Other idea would be to say any CPE
+         * found based on LOW confidence evidence should have a different CPE type? (this
+         * might be a better solution then just removing the URL for &quot;best-guess&quot; matches).
+         */
+        //Set&lt;Evidence&gt; groupId = dependency.getVendorEvidence().getEvidence(&quot;pom&quot;, &quot;groupid&quot;);
+        //Set&lt;Evidence&gt; artifactId = dependency.getVendorEvidence().getEvidence(&quot;pom&quot;, &quot;artifactid&quot;);
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        while (itr.hasNext()) {</span>
+<span class="fc" id="L301">            final Identifier i = itr.next();</span>
+            //TODO move this startsWith expression to the base suppression file
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (&quot;cpe&quot;.equals(i.getType())) {</span>
+<span class="pc bpc" id="L304" title="17 of 42 branches missed.">                if ((i.getValue().matches(&quot;.*c\\+\\+.*&quot;)</span>
+                        || i.getValue().startsWith(&quot;cpe:/a:file:file&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:mozilla:mozilla&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:cvs:cvs&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:ftp:ftp&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:tcp:tcp&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:ssh:ssh&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:lookup:lookup&quot;))
+                        &amp;&amp; (dependency.getFileName().toLowerCase().endsWith(&quot;.jar&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;pom.xml&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.dll&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.exe&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.nuspec&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.zip&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.sar&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.apk&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.tar&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.gz&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.tgz&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.ear&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.war&quot;))) {
+<span class="fc" id="L325">                    itr.remove();</span>
+<span class="pc bpc" id="L326" title="11 of 14 branches missed.">                } else if ((i.getValue().startsWith(&quot;cpe:/a:jquery:jquery&quot;)</span>
+                        || i.getValue().startsWith(&quot;cpe:/a:prototypejs:prototype&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:yahoo:yui&quot;))
+                        &amp;&amp; (dependency.getFileName().toLowerCase().endsWith(&quot;.jar&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;pom.xml&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.dll&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.exe&quot;))) {
+<span class="nc" id="L333">                    itr.remove();</span>
+<span class="pc bpc" id="L334" title="14 of 20 branches missed.">                } else if ((i.getValue().startsWith(&quot;cpe:/a:microsoft:excel&quot;)</span>
+                        || i.getValue().startsWith(&quot;cpe:/a:microsoft:word&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:microsoft:visio&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:microsoft:powerpoint&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:microsoft:office&quot;)
+                        || i.getValue().startsWith(&quot;cpe:/a:core_ftp:core_ftp&quot;))
+                        &amp;&amp; (dependency.getFileName().toLowerCase().endsWith(&quot;.jar&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.ear&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;.war&quot;)
+                        || dependency.getFileName().toLowerCase().endsWith(&quot;pom.xml&quot;))) {
+<span class="nc" id="L344">                    itr.remove();</span>
+<span class="pc bpc" id="L345" title="1 of 4 branches missed.">                } else if (i.getValue().startsWith(&quot;cpe:/a:apache:maven&quot;)</span>
+                        &amp;&amp; !dependency.getFileName().toLowerCase().matches(&quot;maven-core-[\\d\\.]+\\.jar&quot;)) {
+<span class="fc" id="L347">                    itr.remove();</span>
+<span class="pc bpc" id="L348" title="3 of 4 branches missed.">                } else if (i.getValue().startsWith(&quot;cpe:/a:m-core:m-core&quot;)</span>
+                        &amp;&amp; !dependency.getEvidenceUsed().containsUsedString(&quot;m-core&quot;)) {
+<span class="nc" id="L350">                    itr.remove();</span>
+<span class="pc bpc" id="L351" title="1 of 4 branches missed.">                } else if (i.getValue().startsWith(&quot;cpe:/a:jboss:jboss&quot;)</span>
+                        &amp;&amp; !dependency.getFileName().toLowerCase().matches(&quot;jboss-?[\\d\\.-]+(GA)?\\.jar&quot;)) {
+<span class="fc" id="L353">                    itr.remove();</span>
+                }
+            }
+<span class="fc" id="L356">        }</span>
+<span class="fc" id="L357">    }</span>
+
+    /**
+     * Removes CPE matches for the wrong version of a dependency. Currently,
+     * this only covers Axis 1 &amp; 2.
+     *
+     * @param dependency the dependency to analyze
+     */
+    private void removeWrongVersionMatches(Dependency dependency) {
+<span class="fc" id="L366">        final Set&lt;Identifier&gt; identifiers = dependency.getIdentifiers();</span>
+<span class="fc" id="L367">        final Iterator&lt;Identifier&gt; itr = identifiers.iterator();</span>
+
+<span class="fc" id="L369">        final String fileName = dependency.getFileName();</span>
+<span class="pc bpc" id="L370" title="1 of 4 branches missed.">        if (fileName != null &amp;&amp; fileName.contains(&quot;axis2&quot;)) {</span>
+<span class="fc bfc" id="L371" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L372">                final Identifier i = itr.next();</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                if (&quot;cpe&quot;.equals(i.getType())) {</span>
+<span class="fc" id="L374">                    final String cpe = i.getValue();</span>
+<span class="pc bpc" id="L375" title="2 of 6 branches missed.">                    if (cpe != null &amp;&amp; (cpe.startsWith(&quot;cpe:/a:apache:axis:&quot;) || &quot;cpe:/a:apache:axis&quot;.equals(cpe))) {</span>
+<span class="fc" id="L376">                        itr.remove();</span>
+                    }
+                }
+<span class="fc" id="L379">            }</span>
+<span class="pc bpc" id="L380" title="1 of 4 branches missed.">        } else if (fileName != null &amp;&amp; fileName.contains(&quot;axis&quot;)) {</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">            while (itr.hasNext()) {</span>
+<span class="fc" id="L382">                final Identifier i = itr.next();</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                if (&quot;cpe&quot;.equals(i.getType())) {</span>
+<span class="fc" id="L384">                    final String cpe = i.getValue();</span>
+<span class="pc bpc" id="L385" title="3 of 6 branches missed.">                    if (cpe != null &amp;&amp; (cpe.startsWith(&quot;cpe:/a:apache:axis2:&quot;) || &quot;cpe:/a:apache:axis2&quot;.equals(cpe))) {</span>
+<span class="nc" id="L386">                        itr.remove();</span>
+                    }
+                }
+<span class="fc" id="L389">            }</span>
+        }
+<span class="fc" id="L391">    }</span>
+
+    /**
+     * There are some known CPE entries, specifically regarding sun and oracle
+     * products due to the acquisition and changes in product names, that based
+     * on given evidence we can add the related CPE entries to ensure a complete
+     * list of CVE entries.
+     *
+     * @param dependency the dependency being analyzed
+     */
+    private void addFalseNegativeCPEs(Dependency dependency) {
+        //TODO move this to the hint analyzer
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        for (final Identifier identifier : dependency.getIdentifiers()) {</span>
+<span class="pc bpc" id="L404" title="5 of 12 branches missed.">            if (&quot;cpe&quot;.equals(identifier.getType()) &amp;&amp; identifier.getValue() != null</span>
+                    &amp;&amp; (identifier.getValue().startsWith(&quot;cpe:/a:oracle:opensso:&quot;)
+                    || identifier.getValue().startsWith(&quot;cpe:/a:oracle:opensso_enterprise:&quot;)
+                    || identifier.getValue().startsWith(&quot;cpe:/a:sun:opensso_enterprise:&quot;)
+                    || identifier.getValue().startsWith(&quot;cpe:/a:sun:opensso:&quot;))) {
+<span class="nc" id="L409">                final String newCpe = String.format(&quot;cpe:/a:sun:opensso_enterprise:%s&quot;, identifier.getValue().substring(22));</span>
+<span class="nc" id="L410">                final String newCpe2 = String.format(&quot;cpe:/a:oracle:opensso_enterprise:%s&quot;, identifier.getValue().substring(22));</span>
+<span class="nc" id="L411">                final String newCpe3 = String.format(&quot;cpe:/a:sun:opensso:%s&quot;, identifier.getValue().substring(22));</span>
+<span class="nc" id="L412">                final String newCpe4 = String.format(&quot;cpe:/a:oracle:opensso:%s&quot;, identifier.getValue().substring(22));</span>
+                try {
+<span class="nc" id="L414">                    dependency.addIdentifier(&quot;cpe&quot;,</span>
+                            newCpe,
+                            String.format(CPEAnalyzer.NVD_SEARCH_URL, URLEncoder.encode(newCpe, &quot;UTF-8&quot;)));
+<span class="nc" id="L417">                    dependency.addIdentifier(&quot;cpe&quot;,</span>
+                            newCpe2,
+                            String.format(CPEAnalyzer.NVD_SEARCH_URL, URLEncoder.encode(newCpe2, &quot;UTF-8&quot;)));
+<span class="nc" id="L420">                    dependency.addIdentifier(&quot;cpe&quot;,</span>
+                            newCpe3,
+                            String.format(CPEAnalyzer.NVD_SEARCH_URL, URLEncoder.encode(newCpe3, &quot;UTF-8&quot;)));
+<span class="nc" id="L423">                    dependency.addIdentifier(&quot;cpe&quot;,</span>
+                            newCpe4,
+                            String.format(CPEAnalyzer.NVD_SEARCH_URL, URLEncoder.encode(newCpe4, &quot;UTF-8&quot;)));
+<span class="nc" id="L426">                } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L427">                    LOGGER.debug(&quot;&quot;, ex);</span>
+<span class="nc" id="L428">                }</span>
+            }
+<span class="fc" id="L430">        }</span>
+<span class="fc" id="L431">    }</span>
+
+    /**
+     * Removes duplicate entries identified that are contained within JAR files.
+     * These occasionally crop up due to POM entries or other types of files
+     * (such as DLLs and EXEs) being contained within the JAR.
+     *
+     * @param dependency the dependency that might be a duplicate
+     * @param engine the engine used to scan all dependencies
+     */
+    private synchronized void removeDuplicativeEntriesFromJar(Dependency dependency, Engine engine) {
+<span class="fc bfc" id="L442" title="All 4 branches covered.">        if (dependency.getFileName().toLowerCase().endsWith(&quot;pom.xml&quot;)</span>
+                || DLL_EXE_FILTER.accept(dependency.getActualFile())) {
+<span class="fc" id="L444">            String parentPath = dependency.getFilePath().toLowerCase();</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            if (parentPath.contains(&quot;.jar&quot;)) {</span>
+<span class="fc" id="L446">                parentPath = parentPath.substring(0, parentPath.indexOf(&quot;.jar&quot;) + 4);</span>
+<span class="fc" id="L447">                final List&lt;Dependency&gt; dependencies = engine.getDependencies();</span>
+<span class="fc" id="L448">                final Dependency parent = findDependency(parentPath, dependencies);</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                if (parent != null) {</span>
+<span class="fc" id="L450">                    boolean remove = false;</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">                    for (Identifier i : dependency.getIdentifiers()) {</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">                        if (&quot;cpe&quot;.equals(i.getType())) {</span>
+<span class="fc" id="L453">                            final String trimmedCPE = trimCpeToVendor(i.getValue());</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">                            for (Identifier parentId : parent.getIdentifiers()) {</span>
+<span class="pc bpc" id="L455" title="1 of 4 branches missed.">                                if (&quot;cpe&quot;.equals(parentId.getType()) &amp;&amp; parentId.getValue().startsWith(trimmedCPE)) {</span>
+<span class="fc" id="L456">                                    remove |= true;</span>
+                                }
+<span class="fc" id="L458">                            }</span>
+                        }
+<span class="fc bfc" id="L460" title="All 2 branches covered.">                        if (!remove) { //we can escape early</span>
+<span class="fc" id="L461">                            return;</span>
+                        }
+<span class="fc" id="L463">                    }</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">                    if (remove) {</span>
+<span class="fc" id="L465">                        dependencies.remove(dependency);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L470">    }</span>
+
+    /**
+     * Retrieves a given dependency, based on a given path, from a list of
+     * dependencies.
+     *
+     * @param dependencyPath the path of the dependency to return
+     * @param dependencies the collection of dependencies to search
+     * @return the dependency object for the given path, otherwise null
+     */
+    private Dependency findDependency(String dependencyPath, List&lt;Dependency&gt; dependencies) {
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        for (Dependency d : dependencies) {</span>
+<span class="fc bfc" id="L482" title="All 2 branches covered.">            if (d.getFilePath().equalsIgnoreCase(dependencyPath)) {</span>
+<span class="fc" id="L483">                return d;</span>
+            }
+<span class="fc" id="L485">        }</span>
+<span class="nc" id="L486">        return null;</span>
+    }
+
+    /**
+     * Takes a full CPE and returns the CPE trimmed to include only vendor and
+     * product.
+     *
+     * @param value the CPE value to trim
+     * @return a CPE value that only includes the vendor and product
+     */
+    private String trimCpeToVendor(String value) {
+        //cpe:/a:jruby:jruby:1.0.8
+<span class="fc" id="L498">        final int pos1 = value.indexOf(':', 7); //right of vendor</span>
+<span class="fc" id="L499">        final int pos2 = value.indexOf(':', pos1 + 1); //right of product</span>
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (pos2 &lt; 0) {</span>
+<span class="nc" id="L501">            return value;</span>
+        } else {
+<span class="fc" id="L503">            return value.substring(0, pos2);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.7.9.201702052155</span></div></body></html>
