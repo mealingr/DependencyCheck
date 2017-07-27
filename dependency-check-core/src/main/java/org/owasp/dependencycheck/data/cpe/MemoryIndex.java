@@ -42,7 +42,6 @@ import org.owasp.dependencycheck.data.lucene.LuceneUtils;
 import org.owasp.dependencycheck.data.lucene.SearchFieldAnalyzer;
 import org.owasp.dependencycheck.data.nvdcve.CveDB;
 import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
-import org.owasp.dependencycheck.utils.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,16 +51,12 @@ import org.slf4j.LoggerFactory;
  *
  * @author Jeremy Long
  */
-public final class CpeMemoryIndex {
+public class MemoryIndex implements AutoCloseable {
 
     /**
      * The logger.
      */
-    private static final Logger LOGGER = LoggerFactory.getLogger(CpeMemoryIndex.class);
-    /**
-     * singleton instance.
-     */
-    private static final CpeMemoryIndex INSTANCE = new CpeMemoryIndex();
+    private static final Logger LOGGER = LoggerFactory.getLogger(MemoryIndex.class);
     /**
      * The in memory Lucene index.
      */
@@ -85,60 +80,35 @@ public final class CpeMemoryIndex {
     /**
      * The search field analyzer for the product field.
      */
-    private SearchFieldAnalyzer productFieldAnalyzer;
-    /**
-     * The search field analyzer for the vendor field.
-     */
-    private SearchFieldAnalyzer vendorFieldAnalyzer;
-    /**
-     * A flag indicating whether or not the index is open.
-     */
-    private boolean openState = false;
+    private SearchFieldAnalyzer fieldAnalyzer;
 
-    /**
-     * private constructor for singleton.
-     */
-    private CpeMemoryIndex() {
-    }
-
-    /**
-     * Gets the singleton instance of the CpeMemoryIndex.
-     *
-     * @return the instance of the CpeMemoryIndex
-     */
-    public static CpeMemoryIndex getInstance() {
-        return INSTANCE;
+    public enum IndexType {
+        PRODUCT,
+        VENDOR
     }
 
     /**
      * Creates and loads data into an in memory index.
      *
      * @param cve the data source to retrieve the cpe data
+     * @param indexType whether the index is for products or vendors
      * @throws IndexException thrown if there is an error creating the index
      */
-    public synchronized void open(CveDB cve) throws IndexException {
-        if (!openState) {
-            index = new RAMDirectory();
-            buildIndex(cve);
-            try {
-                indexReader = DirectoryReader.open(index);
-            } catch (IOException ex) {
-                throw new IndexException(ex);
-            }
-            indexSearcher = new IndexSearcher(indexReader);
-            searchingAnalyzer = createSearchingAnalyzer();
-            queryParser = new QueryParser(LuceneUtils.CURRENT_VERSION, Fields.DOCUMENT_KEY, searchingAnalyzer);
-            openState = true;
+    public MemoryIndex(CveDB cve, IndexType indexType) throws IndexException {
+        index = new RAMDirectory();
+        if (indexType == IndexType.VENDOR) {
+            buildIndex(cve.getVendorList());
+        } else {
+            buildIndex(cve.getProductList());
         }
-    }
-
-    /**
-     * returns whether or not the index is open.
-     *
-     * @return whether or not the index is open
-     */
-    public synchronized boolean isOpen() {
-        return openState;
+        try {
+            indexReader = DirectoryReader.open(index);
+        } catch (IOException ex) {
+            throw new IndexException(ex);
+        }
+        indexSearcher = new IndexSearcher(indexReader);
+        searchingAnalyzer = createSearchingAnalyzer();
+        queryParser = new QueryParser(LuceneUtils.CURRENT_VERSION, Fields.DOCUMENT_KEY, searchingAnalyzer);
     }
 
     /**
@@ -149,18 +119,16 @@ public final class CpeMemoryIndex {
     private Analyzer createSearchingAnalyzer() {
         final Map<String, Analyzer> fieldAnalyzers = new HashMap<>();
         fieldAnalyzers.put(Fields.DOCUMENT_KEY, new KeywordAnalyzer());
-        productFieldAnalyzer = new SearchFieldAnalyzer(LuceneUtils.CURRENT_VERSION);
-        vendorFieldAnalyzer = new SearchFieldAnalyzer(LuceneUtils.CURRENT_VERSION);
-        fieldAnalyzers.put(Fields.PRODUCT, productFieldAnalyzer);
-        fieldAnalyzers.put(Fields.VENDOR, vendorFieldAnalyzer);
-
+        fieldAnalyzer = new SearchFieldAnalyzer(LuceneUtils.CURRENT_VERSION);
+        fieldAnalyzers.put(Fields.FIELD, fieldAnalyzer);
         return new PerFieldAnalyzerWrapper(new KeywordAnalyzer(), fieldAnalyzers);
     }
 
     /**
      * Closes the CPE Index.
      */
-    public synchronized void close() {
+    @Override
+    public void close() {
         if (searchingAnalyzer != null) {
             searchingAnalyzer.close();
             searchingAnalyzer = null;
@@ -179,7 +147,6 @@ public final class CpeMemoryIndex {
             index.close();
             index = null;
         }
-        openState = false;
     }
 
     /**
@@ -188,23 +155,19 @@ public final class CpeMemoryIndex {
      * @param cve the data base containing the CPE data
      * @throws IndexException thrown if there is an issue creating the index
      */
-    private void buildIndex(CveDB cve) throws IndexException {
+    private void buildIndex(Set<String> list) throws IndexException {
         try (Analyzer analyzer = createSearchingAnalyzer();
                 IndexWriter indexWriter = new IndexWriter(index, new IndexWriterConfig(LuceneUtils.CURRENT_VERSION, analyzer))) {
             // Tip: reuse the Document and Fields for performance...
             // See "Re-use Document and Field instances" from
             // http://wiki.apache.org/lucene-java/ImproveIndexingSpeed
             final Document doc = new Document();
-            final Field v = new TextField(Fields.VENDOR, Fields.VENDOR, Field.Store.YES);
-            final Field p = new TextField(Fields.PRODUCT, Fields.PRODUCT, Field.Store.YES);
-            doc.add(v);
-            doc.add(p);
+            final Field f = new TextField(Fields.FIELD, Fields.FIELD, Field.Store.YES);
+            doc.add(f);
 
-            final Set<Pair<String, String>> data = cve.getVendorProductList();
-            for (Pair<String, String> pair : data) {
-                if (pair.getLeft() != null && pair.getRight() != null) {
-                    v.setStringValue(pair.getLeft());
-                    p.setStringValue(pair.getRight());
+            for (String entry : list) {
+                if (entry!=null) {
+                    f.setStringValue(entry);
                     indexWriter.addDocument(doc);
                     resetFieldAnalyzer();
                 }
@@ -225,11 +188,8 @@ public final class CpeMemoryIndex {
      * Resets the product and vendor field analyzers.
      */
     private void resetFieldAnalyzer() {
-        if (productFieldAnalyzer != null) {
-            productFieldAnalyzer.clear();
-        }
-        if (vendorFieldAnalyzer != null) {
-            vendorFieldAnalyzer.clear();
+        if (fieldAnalyzer != null) {
+            fieldAnalyzer.clear();
         }
     }
 

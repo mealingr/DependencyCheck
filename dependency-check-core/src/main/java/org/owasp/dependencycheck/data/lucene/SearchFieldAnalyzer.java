@@ -18,6 +18,7 @@
 package org.owasp.dependencycheck.data.lucene;
 
 import java.io.Reader;
+import java.util.Arrays;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
@@ -25,6 +26,7 @@ import org.apache.lucene.analysis.core.LowerCaseFilter;
 import org.apache.lucene.analysis.core.StopAnalyzer;
 import org.apache.lucene.analysis.core.StopFilter;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
 
 /**
@@ -39,7 +41,8 @@ public class SearchFieldAnalyzer extends Analyzer {
      */
     private final Version version;
     /**
-     * A local reference to the TokenPairConcatenatingFilter so that we can clear any left over state if this analyzer is re-used.
+     * A local reference to the TokenPairConcatenatingFilter so that we can
+     * clear any left over state if this analyzer is re-used.
      */
     private TokenPairConcatenatingFilter concatenatingFilter;
 
@@ -77,16 +80,21 @@ public class SearchFieldAnalyzer extends Analyzer {
         stream = new UrlTokenizingFilter(stream);
         concatenatingFilter = new TokenPairConcatenatingFilter(stream);
         stream = concatenatingFilter;
-        stream = new StopFilter(version, stream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);
+
+        CharArraySet stops = new CharArraySet(version, StopAnalyzer.ENGLISH_STOP_WORDS_SET, true);
+        stops.addAll(Arrays.asList("software", "framework", "core", "inc", "com", "org", "net", "www", "consulting","ltd","foundation"));
+        stream = new StopFilter(version, stream, stops);
 
         return new TokenStreamComponents(source, stream);
     }
 
     /**
      * <p>
-     * Resets the analyzer and clears any internal state data that may have been left-over from previous uses of the analyzer.</p>
+     * Resets the analyzer and clears any internal state data that may have been
+     * left-over from previous uses of the analyzer.</p>
      * <p>
-     * <b>If this analyzer is re-used this method must be called between uses.</b></p>
+     * <b>If this analyzer is re-used this method must be called between
+     * uses.</b></p>
      */
     public void clear() {
         if (concatenatingFilter != null) {

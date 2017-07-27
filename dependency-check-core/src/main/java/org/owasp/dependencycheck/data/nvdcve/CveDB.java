@@ -181,6 +181,14 @@ public final class CveDB implements AutoCloseable {
         /**
          * Key for SQL Statement.
          */
+        SELECT_VENDOR_LIST,
+        /**
+         * Key for SQL Statement.
+         */
+        SELECT_PRODUCT_LIST,
+        /**
+         * Key for SQL Statement.
+         */
         SELECT_VULNERABILITY,
         /**
          * Key for SQL Statement.
@@ -452,20 +460,45 @@ public final class CveDB implements AutoCloseable {
     }
 
     /**
-     * Returns the entire list of vendor/product combinations.
+     * Returns the entire list of vendors.
      *
-     * @return the entire list of vendor/product combinations
+     * @return the entire list of vendors
      * @throws DatabaseException thrown when there is an error retrieving the
      * data from the DB
      */
-    public synchronized Set<Pair<String, String>> getVendorProductList() throws DatabaseException {
-        final Set<Pair<String, String>> data = new HashSet<>();
+    public synchronized Set<String> getVendorList() throws DatabaseException {
+        final Set<String> data = new HashSet<>();
         ResultSet rs = null;
         try {
-            final PreparedStatement ps = getPreparedStatement(SELECT_VENDOR_PRODUCT_LIST);
+            final PreparedStatement ps = getPreparedStatement(SELECT_VENDOR_LIST);
             rs = ps.executeQuery();
             while (rs.next()) {
-                data.add(new Pair<>(rs.getString(1), rs.getString(2)));
+                data.add(rs.getString(1));
+            }
+        } catch (SQLException ex) {
+            final String msg = "An unexpected SQL Exception occurred; please see the verbose log for more details.";
+            throw new DatabaseException(msg, ex);
+        } finally {
+            DBUtils.closeResultSet(rs);
+        }
+        return data;
+    }
+
+    /**
+     * Returns the entire list of products.
+     *
+     * @return the entire list of products
+     * @throws DatabaseException thrown when there is an error retrieving the
+     * data from the DB
+     */
+    public synchronized Set<String> getProductList() throws DatabaseException {
+        final Set<String> data = new HashSet<>();
+        ResultSet rs = null;
+        try {
+            final PreparedStatement ps = getPreparedStatement(SELECT_PRODUCT_LIST);
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                data.add(rs.getString(1));
             }
         } catch (SQLException ex) {
             final String msg = "An unexpected SQL Exception occurred; please see the verbose log for more details.";

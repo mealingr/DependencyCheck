@@ -18,6 +18,7 @@
 package org.owasp.dependencycheck.data.lucene;
 
 import java.io.Reader;
+import java.util.Arrays;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
@@ -25,6 +26,7 @@ import org.apache.lucene.analysis.core.LowerCaseFilter;
 import org.apache.lucene.analysis.core.StopAnalyzer;
 import org.apache.lucene.analysis.core.StopFilter;
 import org.apache.lucene.analysis.miscellaneous.WordDelimiterFilter;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.util.Version;
 
 /**
@@ -77,7 +79,10 @@ public class FieldAnalyzer extends Analyzer {
                 | WordDelimiterFilter.STEM_ENGLISH_POSSESSIVE, null);
 
         stream = new LowerCaseFilter(version, stream);
-        stream = new StopFilter(version, stream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);
+        
+        CharArraySet stops = new CharArraySet(version, StopAnalyzer.ENGLISH_STOP_WORDS_SET, true);
+        stops.addAll(Arrays.asList("software", "framework", "core", "inc", "com", "org", "net", "www", "consulting","ltd","foundation"));
+        stream = new StopFilter(version, stream, stops);
 
         return new TokenStreamComponents(source, stream);
     }

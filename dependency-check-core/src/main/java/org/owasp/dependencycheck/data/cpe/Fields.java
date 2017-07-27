@@ -29,13 +29,9 @@ public final class Fields {
      */
     public static final String DOCUMENT_KEY = "id";
     /**
-     * The key for the vendor field.
+     * The key for the field.
      */
-    public static final String VENDOR = "vendor";
-    /**
-     * The key for the product field.
-     */
-    public static final String PRODUCT = "product";
+    public static final String FIELD = "field";
 
     /**
      * Private constructor as this is more of an enumeration rather then a full class.

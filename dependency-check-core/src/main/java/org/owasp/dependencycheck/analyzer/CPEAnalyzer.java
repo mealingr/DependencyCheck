@@ -34,7 +34,7 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.owasp.dependencycheck.Engine;
 import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
-import org.owasp.dependencycheck.data.cpe.CpeMemoryIndex;
+import org.owasp.dependencycheck.data.cpe.MemoryIndex;
 import org.owasp.dependencycheck.data.cpe.Fields;
 import org.owasp.dependencycheck.data.cpe.IndexEntry;
 import org.owasp.dependencycheck.data.cpe.IndexException;
@@ -91,9 +91,13 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      */
     private static final int STRING_BUILDER_BUFFER = 20;
     /**
-     * The CPE in memory index.
+     * The vendor in memory index.
      */
-    private CpeMemoryIndex cpe;
+    private MemoryIndex vendorIndex;
+    /**
+     * The vendor in memory index.
+     */
+    private MemoryIndex productIndex;
     /**
      * The CVE Database.
      */
@@ -162,18 +166,16 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      * usually occurs when the database is in use by another process.
      */
     public void open() throws IOException, DatabaseException {
-        if (!isOpen()) {
-            cve = CveDB.getInstance();
-            cpe = CpeMemoryIndex.getInstance();
-            try {
-                final long creationStart = System.currentTimeMillis();
-                cpe.open(cve);
-                final long creationSeconds = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - creationStart);
-                LOGGER.info("Created CPE Index ({} seconds)", creationSeconds);
-            } catch (IndexException ex) {
-                LOGGER.debug("IndexException", ex);
-                throw new DatabaseException(ex);
-            }
+        cve = CveDB.getInstance();
+        try {
+            final long creationStart = System.currentTimeMillis();
+            vendorIndex = new MemoryIndex(cve, MemoryIndex.IndexType.VENDOR);
+            productIndex = new MemoryIndex(cve, MemoryIndex.IndexType.PRODUCT);
+            final long creationSeconds = TimeUnit.MILLISECONDS.toSeconds(System.currentTimeMillis() - creationStart);
+            LOGGER.info("Created CPE Indexes ({} seconds)", creationSeconds);
+        } catch (IndexException ex) {
+            LOGGER.debug("IndexException", ex);
+            throw new DatabaseException(ex);
         }
     }
 
@@ -186,19 +188,14 @@ public class CPEAnalyzer extends AbstractAnalyzer {
             cve.close();
             cve = null;
         }
-        if (cpe != null) {
-            cpe.close();
-            cpe = null;
+        if (vendorIndex != null) {
+            vendorIndex.close();
+            vendorIndex = null;
         }
-    }
-
-    /**
-     * Returns whether or not the analyzer is open.
-     *
-     * @return <code>true</code> if the analyzer is open
-     */
-    public boolean isOpen() {
-        return cpe != null && cpe.isOpen();
+        if (productIndex != null) {
+            productIndex.close();
+            productIndex = null;
+        }
     }
 
     /**
@@ -212,7 +209,6 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      * @throws ParseException is thrown when the Lucene query cannot be parsed.
      */
     protected void determineCPE(Dependency dependency) throws CorruptIndexException, IOException, ParseException {
-        //TODO test dojo-war against this. we should get dojo-toolkit:dojo-toolkit AND dojo-toolkit:toolkit
         String vendors = "";
         String products = "";
         for (Confidence confidence : Confidence.values()) {
@@ -225,19 +221,18 @@ public class CPEAnalyzer extends AbstractAnalyzer {
                 LOGGER.debug("product search: {}", products);
             }
             if (!vendors.isEmpty() && !products.isEmpty()) {
-                final List<IndexEntry> entries = searchCPE(vendors, products, dependency.getVendorEvidence().getWeighting(),
-                        dependency.getProductEvidence().getWeighting());
-                if (entries == null) {
+                final List<String> vendorList = searchIndex(vendorIndex, vendors, dependency.getVendorEvidence().getWeighting());
+                final List<String> productList = searchIndex(productIndex, products, dependency.getProductEvidence().getWeighting());
+                if (vendorList == null || productList == null || vendorList.isEmpty() || productList.isEmpty()) {
                     continue;
                 }
                 boolean identifierAdded = false;
-                for (IndexEntry e : entries) {
-                    LOGGER.debug("Verifying entry: {}", e);
-                    if (verifyEntry(e, dependency)) {
-                        final String vendor = e.getVendor();
-                        final String product = e.getProduct();
-                        LOGGER.debug("identified vendor/product: {}/{}", vendor, product);
-                        identifierAdded |= determineIdentifiers(dependency, vendor, product, confidence);
+                for (String v : vendorList) {
+                    for (String p : productList) {
+                        if (verifyEntry(v, p, dependency)) {
+                            LOGGER.debug("Verified entry: {}:{}", v, p);
+                            identifierAdded |= determineIdentifiers(dependency, v, p, confidence);
+                        }
                     }
                 }
                 if (identifierAdded) {
@@ -282,41 +277,31 @@ public class CPEAnalyzer extends AbstractAnalyzer {
 
     /**
      * <p>
-     * Searches the Lucene CPE index to identify possible CPE entries associated
-     * with the supplied vendor, product, and version.</p>
+     * Searches the Lucene index to identify possible entries associated with
+     * the supplied search terms and weighting.</p>
      *
-     * <p>
-     * If either the vendorWeightings or productWeightings lists have been
-     * populated this data is used to add weighting factors to the search.</p>
-     *
-     * @param vendor the text used to search the vendor field
-     * @param product the text used to search the product field
-     * @param vendorWeightings a list of strings to use to add weighting factors
-     * to the vendor field
-     * @param productWeightings Adds a list of strings that will be used to add
-     * weighting factors to the product search
+     * @param index the index to search
+     * @param terms the text used to search
+     * @param weightings a list of strings to use to add weighting factors to
+     * the vendor field
      * @return a list of possible CPE values
      */
-    protected List<IndexEntry> searchCPE(String vendor, String product,
-            Set<String> vendorWeightings, Set<String> productWeightings) {
-
-        final List<IndexEntry> ret = new ArrayList<>(MAX_QUERY_RESULTS);
-
-        final String searchString = buildSearch(vendor, product, vendorWeightings, productWeightings);
+    protected List<String> searchIndex(MemoryIndex index, String terms, Set<String> weightings) {
+        final List<String> ret = new ArrayList<>(MAX_QUERY_RESULTS);
+        final String searchString = buildSearch(terms, weightings);
         if (searchString == null) {
             return ret;
         }
         try {
-            final TopDocs docs = cpe.search(searchString, MAX_QUERY_RESULTS);
+            final TopDocs docs = index.search(searchString, MAX_QUERY_RESULTS);
             for (ScoreDoc d : docs.scoreDocs) {
-                if (d.score >= 0.08) {
-                    final Document doc = cpe.getDocument(d.doc);
-                    final IndexEntry entry = new IndexEntry();
-                    entry.setVendor(doc.get(Fields.VENDOR));
-                    entry.setProduct(doc.get(Fields.PRODUCT));
-                    entry.setSearchScore(d.score);
-                    if (!ret.contains(entry)) {
-                        ret.add(entry);
+                if (d.score >= 0.1) {
+                    final Document doc = index.getDocument(d.doc);
+                    final String field = doc.get(Fields.FIELD);
+                    LOGGER.debug("Score {} on {} for {}", d.score, field, searchString);
+
+                    if (!ret.contains(field)) {
+                        ret.add(field);
                     }
                 }
             }
@@ -337,30 +322,19 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      * a valid search query.</p>
      *
      * <p>
-     * If either the possibleVendor or possibleProducts lists have been
-     * populated this data is used to add weighting factors to the search string
-     * generated.</p>
+     * If either the fieldWeighting list has been populated with data it is used
+     * to add weighting factors to the search string generated.</p>
      *
-     * @param vendor text to search the vendor field
-     * @param product text to search the product field
-     * @param vendorWeighting a list of strings to apply to the vendor to boost
+     * @param field text to search the vendor field
+     * @param fieldWeighting a list of strings to apply to the vendor to boost
      * the terms weight
-     * @param productWeightings a list of strings to apply to the product to
-     * boost the terms weight
      * @return the Lucene query
      */
-    protected String buildSearch(String vendor, String product,
-            Set<String> vendorWeighting, Set<String> productWeightings) {
-        final String v = vendor; //.replaceAll("[^\\w\\d]", " ");
-        final String p = product; //.replaceAll("[^\\w\\d]", " ");
-        final StringBuilder sb = new StringBuilder(v.length() + p.length()
-                + Fields.PRODUCT.length() + Fields.VENDOR.length() + STRING_BUILDER_BUFFER);
-
-        if (!appendWeightedSearch(sb, Fields.PRODUCT, p, productWeightings)) {
-            return null;
-        }
-        sb.append(" AND ");
-        if (!appendWeightedSearch(sb, Fields.VENDOR, v, vendorWeighting)) {
+    protected String buildSearch(String field, Set<String> fieldWeighting) {
+        final String f = field; //.replaceAll("[^\\w\\d]", " ");
+        final StringBuilder sb = new StringBuilder(f.length()
+                + Fields.FIELD.length() + STRING_BUILDER_BUFFER);
+        if (!appendWeightedSearch(sb, Fields.FIELD, f, fieldWeighting)) {
             return null;
         }
         return sb.toString();
@@ -381,7 +355,7 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      * @return if the append was successful.
      */
     private boolean appendWeightedSearch(StringBuilder sb, String field, String searchText, Set<String> weightedText) {
-        sb.append(' ').append(field).append(":( ");
+        sb.append(field).append(":(");
 
         final String cleanText = cleanseText(searchText);
 
@@ -418,7 +392,7 @@ public class CPEAnalyzer extends AbstractAnalyzer {
                 }
             }
         }
-        sb.append(" ) ");
+        sb.append(")");
         return true;
     }
 
@@ -460,14 +434,10 @@ public class CPEAnalyzer extends AbstractAnalyzer {
      * @param dependency the dependency that the CPE entries could be for.
      * @return whether or not the entry is valid.
      */
-    private boolean verifyEntry(final IndexEntry entry, final Dependency dependency) {
+    private boolean verifyEntry(final String vendor, final String product, final Dependency dependency) {
         boolean isValid = false;
-
-        //TODO - does this nullify some of the fuzzy matching that happens in the lucene search?
-        // for instance CPE some-component and in the evidence we have SomeComponent.
-        if (collectionContainsString(dependency.getProductEvidence(), entry.getProduct())
-                && collectionContainsString(dependency.getVendorEvidence(), entry.getVendor())) {
-            //&& collectionContainsVersion(dependency.getVersionEvidence(), entry.getVersion())
+        if (collectionContainsString(dependency.getProductEvidence(), product)
+                && collectionContainsString(dependency.getVendorEvidence(), vendor)) {
             isValid = true;
         }
         return isValid;
@@ -561,6 +531,9 @@ public class CPEAnalyzer extends AbstractAnalyzer {
     protected boolean determineIdentifiers(Dependency dependency, String vendor, String product,
             Confidence currentConfidence) throws UnsupportedEncodingException {
         final Set<VulnerableSoftware> cpes = cve.getCPEs(vendor, product);
+        if (cpes.isEmpty()) {
+            return false;
+        }
         DependencyVersion bestGuess = new DependencyVersion("-");
         Confidence bestGuessConf = null;
         boolean hasBroadMatch = false;
