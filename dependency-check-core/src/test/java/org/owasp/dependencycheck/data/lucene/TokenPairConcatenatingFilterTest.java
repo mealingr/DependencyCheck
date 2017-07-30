@@ -26,7 +26,6 @@ import org.apache.lucene.analysis.core.WhitespaceTokenizer;
 import org.junit.After;
 
 import org.junit.Before;
-import org.junit.Test;
 
 /**
  *

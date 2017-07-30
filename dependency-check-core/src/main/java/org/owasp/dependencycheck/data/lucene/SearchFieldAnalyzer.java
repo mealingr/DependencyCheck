@@ -19,6 +19,7 @@ package org.owasp.dependencycheck.data.lucene;
 
 import java.io.Reader;
 import java.util.Arrays;
+import java.util.List;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
@@ -41,10 +42,25 @@ public class SearchFieldAnalyzer extends Analyzer {
      */
     private final Version version;
     /**
-     * A local reference to the TokenPairConcatenatingFilter so that we can
-     * clear any left over state if this analyzer is re-used.
+     * The list of additional stop words to use.
      */
-    private TokenPairConcatenatingFilter concatenatingFilter;
+    private static final List<String> ADDITIONAL_STOP_WORDS = Arrays.asList("software", "framework", "inc",
+            "com", "org", "net", "www", "consulting", "ltd", "foundation");
+    /**
+     * The set of stop words to use in the analyzer.
+     */
+    private final CharArraySet stopWords;
+
+    /**
+     * Returns the set of stop words being used.
+     *
+     * @return the set of stop words being used
+     */
+    public static CharArraySet getStopWords() {
+        CharArraySet words = new CharArraySet(LuceneUtils.CURRENT_VERSION, StopAnalyzer.ENGLISH_STOP_WORDS_SET, true);
+        words.addAll(ADDITIONAL_STOP_WORDS);
+        return words;
+    }
 
     /**
      * Constructs a new SearchFieldAnalyzer.
@@ -53,6 +69,7 @@ public class SearchFieldAnalyzer extends Analyzer {
      */
     public SearchFieldAnalyzer(Version version) {
         this.version = version;
+        stopWords = getStopWords();
     }
 
     /**
@@ -78,11 +95,8 @@ public class SearchFieldAnalyzer extends Analyzer {
 
         stream = new LowerCaseFilter(version, stream);
         stream = new UrlTokenizingFilter(stream);
+        stream = new StopFilter(version, stream, stopWords);
         stream = new TokenPairConcatenatingFilter(stream);
-
-        CharArraySet stops = new CharArraySet(version, StopAnalyzer.ENGLISH_STOP_WORDS_SET, true);
-        stops.addAll(Arrays.asList("software", "framework", "core", "inc", "com", "org", "net", "www", "consulting", "ltd", "foundation"));
-        stream = new StopFilter(version, stream, stops);
 
         return new TokenStreamComponents(source, stream);
     }

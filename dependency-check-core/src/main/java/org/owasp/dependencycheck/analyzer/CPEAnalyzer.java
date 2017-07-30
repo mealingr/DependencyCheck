@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.builder.CompareToBuilder;
+import org.apache.lucene.analysis.util.CharArraySet;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.CorruptIndexException;
 import org.apache.lucene.queryparser.classic.ParseException;
@@ -36,9 +37,9 @@ import org.owasp.dependencycheck.Engine;
 import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
 import org.owasp.dependencycheck.data.cpe.MemoryIndex;
 import org.owasp.dependencycheck.data.cpe.Fields;
-import org.owasp.dependencycheck.data.cpe.IndexEntry;
 import org.owasp.dependencycheck.data.cpe.IndexException;
 import org.owasp.dependencycheck.data.lucene.LuceneUtils;
+import org.owasp.dependencycheck.data.lucene.SearchFieldAnalyzer;
 import org.owasp.dependencycheck.data.nvdcve.CveDB;
 import org.owasp.dependencycheck.data.nvdcve.DatabaseException;
 import org.owasp.dependencycheck.dependency.Confidence;
@@ -295,7 +296,7 @@ public class CPEAnalyzer extends AbstractAnalyzer {
         try {
             final TopDocs docs = index.search(searchString, MAX_QUERY_RESULTS);
             for (ScoreDoc d : docs.scoreDocs) {
-                if (d.score >= 0.1) {
+                if (d.score >= 0.08) {
                     final Document doc = index.getDocument(d.doc);
                     final String field = doc.get(Fields.FIELD);
                     LOGGER.debug("Score {} on {} for {}", d.score, field, searchString);
@@ -458,7 +459,11 @@ public class CPEAnalyzer extends AbstractAnalyzer {
         final String[] words = text.split("[\\s_-]");
         final List<String> list = new ArrayList<>();
         String tempWord = null;
+        CharArraySet stopWords = SearchFieldAnalyzer.getStopWords();
         for (String word : words) {
+            if (stopWords.contains(word)) {
+                continue;
+            }
             /*
              single letter words should be concatenated with the next word.
              so { "m", "core", "sample" } -> { "mcore", "sample" }
