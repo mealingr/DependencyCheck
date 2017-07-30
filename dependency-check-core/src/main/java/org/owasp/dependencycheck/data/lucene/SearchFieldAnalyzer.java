@@ -78,27 +78,12 @@ public class SearchFieldAnalyzer extends Analyzer {
 
         stream = new LowerCaseFilter(version, stream);
         stream = new UrlTokenizingFilter(stream);
-        concatenatingFilter = new TokenPairConcatenatingFilter(stream);
-        stream = concatenatingFilter;
+        stream = new TokenPairConcatenatingFilter(stream);
 
         CharArraySet stops = new CharArraySet(version, StopAnalyzer.ENGLISH_STOP_WORDS_SET, true);
-        stops.addAll(Arrays.asList("software", "framework", "core", "inc", "com", "org", "net", "www", "consulting","ltd","foundation"));
+        stops.addAll(Arrays.asList("software", "framework", "core", "inc", "com", "org", "net", "www", "consulting", "ltd", "foundation"));
         stream = new StopFilter(version, stream, stops);
 
         return new TokenStreamComponents(source, stream);
-    }
-
-    /**
-     * <p>
-     * Resets the analyzer and clears any internal state data that may have been
-     * left-over from previous uses of the analyzer.</p>
-     * <p>
-     * <b>If this analyzer is re-used this method must be called between
-     * uses.</b></p>
-     */
-    public void clear() {
-        if (concatenatingFilter != null) {
-            concatenatingFilter.clear();
-        }
     }
 }

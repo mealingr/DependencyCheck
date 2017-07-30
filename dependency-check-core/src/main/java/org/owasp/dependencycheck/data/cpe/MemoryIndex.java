@@ -169,7 +169,6 @@ public class MemoryIndex implements AutoCloseable {
                 if (entry!=null) {
                     f.setStringValue(entry);
                     indexWriter.addDocument(doc);
-                    resetFieldAnalyzer();
                 }
             }
             indexWriter.commit();
@@ -181,15 +180,6 @@ public class MemoryIndex implements AutoCloseable {
             throw new IndexException("Unable to close an in-memory index", ex);
         } catch (IOException ex) {
             throw new IndexException("Unable to close an in-memory index", ex);
-        }
-    }
-
-    /**
-     * Resets the product and vendor field analyzers.
-     */
-    private void resetFieldAnalyzer() {
-        if (fieldAnalyzer != null) {
-            fieldAnalyzer.clear();
         }
     }
 
@@ -208,7 +198,6 @@ public class MemoryIndex implements AutoCloseable {
             throw new ParseException("Query is null or empty");
         }
         LOGGER.debug(searchString);
-        resetFieldAnalyzer();
         final Query query = queryParser.parse(searchString);
         return search(query, maxQueryResults);
     }
@@ -223,7 +212,6 @@ public class MemoryIndex implements AutoCloseable {
      * @throws IOException thrown if there is an IOException
      */
     public synchronized TopDocs search(Query query, int maxQueryResults) throws CorruptIndexException, IOException {
-        resetFieldAnalyzer();
         return indexSearcher.search(query, maxQueryResults);
     }
 
